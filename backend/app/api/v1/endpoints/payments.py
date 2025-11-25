@@ -1,0 +1,174 @@
+from typing import Optional
+from fastapi import APIRouter, Depends, HTTPException, status, Query
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select, func
+from sqlalchemy.orm import selectinload
+from datetime import date
+from decimal import Decimal
+
+from app.db.session import get_db
+from app.models.payment import Payment, PaymentType, PaymentStatus
+from app.models.invoice import Invoice, InvoiceStatus
+from app.models.user import User
+from app.schemas.payment import PaymentCreate, PaymentUpdate, PaymentResponse
+from app.schemas.common import PaginatedResponse, Message
+from app.core.security import get_current_user
+from app.services.number_generator import generate_payment_number
+
+router = APIRouter()
+
+
+@router.get("", response_model=PaginatedResponse[PaymentResponse])
+async def get_payments(
+    page: int = Query(1, ge=1),
+    page_size: int = Query(10, ge=1, le=100),
+    payment_type: Optional[PaymentType] = None,
+    client_id: Optional[int] = None,
+    vendor_id: Optional[int] = None,
+    from_date: Optional[date] = None,
+    to_date: Optional[date] = None,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Get all payments with pagination."""
+    query = select(Payment).options(
+        selectinload(Payment.client),
+        selectinload(Payment.vendor)
+    )
+
+    if payment_type:
+        query = query.where(Payment.payment_type == payment_type)
+    if client_id:
+        query = query.where(Payment.client_id == client_id)
+    if vendor_id:
+        query = query.where(Payment.vendor_id == vendor_id)
+    if from_date:
+        query = query.where(Payment.payment_date >= from_date)
+    if to_date:
+        query = query.where(Payment.payment_date <= to_date)
+
+    query = query.order_by(Payment.payment_date.desc())
+
+    count_query = select(func.count()).select_from(query.subquery())
+    total_result = await db.execute(count_query)
+    total = total_result.scalar()
+
+    query = query.offset((page - 1) * page_size).limit(page_size)
+    result = await db.execute(query)
+    payments = result.scalars().all()
+
+    return PaginatedResponse(
+        items=[PaymentResponse.model_validate(p) for p in payments],
+        total=total,
+        page=page,
+        page_size=page_size,
+        total_pages=(total + page_size - 1) // page_size,
+    )
+
+
+@router.get("/{payment_id}", response_model=PaymentResponse)
+async def get_payment(
+    payment_id: int,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Get a specific payment."""
+    result = await db.execute(
+        select(Payment)
+        .options(selectinload(Payment.client), selectinload(Payment.vendor))
+        .where(Payment.id == payment_id)
+    )
+    payment = result.scalar_one_or_none()
+    if not payment:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Payment not found")
+    return payment
+
+
+@router.post("", response_model=PaymentResponse, status_code=status.HTTP_201_CREATED)
+async def create_payment(
+    payment_data: PaymentCreate,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Create a new payment/receipt."""
+    # Generate payment number
+    payment_number = await generate_payment_number(db, payment_data.payment_type.value)
+
+    # Calculate net amount
+    net_amount = payment_data.gross_amount - payment_data.tds_amount + payment_data.tcs_amount
+
+    # Create payment
+    payment = Payment(
+        payment_number=payment_number,
+        payment_date=payment_data.payment_date,
+        payment_type=payment_data.payment_type,
+        client_id=payment_data.client_id,
+        vendor_id=payment_data.vendor_id,
+        invoice_id=payment_data.invoice_id,
+        gross_amount=payment_data.gross_amount,
+        tds_amount=payment_data.tds_amount,
+        tcs_amount=payment_data.tcs_amount,
+        net_amount=net_amount,
+        payment_mode=payment_data.payment_mode,
+        reference_number=payment_data.reference_number,
+        bank_name=payment_data.bank_name,
+        bank_account=payment_data.bank_account,
+        cheque_date=payment_data.cheque_date,
+        notes=payment_data.notes,
+        status=PaymentStatus.COMPLETED,
+    )
+
+    db.add(payment)
+
+    # Update invoice if linked
+    if payment_data.invoice_id:
+        invoice_result = await db.execute(select(Invoice).where(Invoice.id == payment_data.invoice_id))
+        invoice = invoice_result.scalar_one_or_none()
+        if invoice:
+            invoice.amount_paid += net_amount
+            invoice.amount_due = invoice.amount_after_tds - invoice.amount_paid
+
+            if invoice.amount_due <= 0:
+                invoice.status = InvoiceStatus.PAID
+            elif invoice.amount_paid > 0:
+                invoice.status = InvoiceStatus.PARTIAL
+
+    await db.commit()
+    await db.refresh(payment)
+
+    # Reload with relationships
+    result = await db.execute(
+        select(Payment)
+        .options(selectinload(Payment.client), selectinload(Payment.vendor))
+        .where(Payment.id == payment.id)
+    )
+    return result.scalar_one()
+
+
+@router.delete("/{payment_id}", response_model=Message)
+async def delete_payment(
+    payment_id: int,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Delete a payment."""
+    result = await db.execute(select(Payment).where(Payment.id == payment_id))
+    payment = result.scalar_one_or_none()
+    if not payment:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Payment not found")
+
+    # Reverse invoice update if linked
+    if payment.invoice_id:
+        invoice_result = await db.execute(select(Invoice).where(Invoice.id == payment.invoice_id))
+        invoice = invoice_result.scalar_one_or_none()
+        if invoice:
+            invoice.amount_paid -= payment.net_amount
+            invoice.amount_due = invoice.amount_after_tds - invoice.amount_paid
+            if invoice.amount_due >= invoice.amount_after_tds:
+                invoice.status = InvoiceStatus.SENT
+            else:
+                invoice.status = InvoiceStatus.PARTIAL
+
+    await db.delete(payment)
+    await db.commit()
+    return Message(message="Payment deleted successfully")
