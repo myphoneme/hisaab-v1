@@ -17,11 +17,13 @@ export interface Client extends BaseEntity {
   pincode: string;
   email: string;
   phone: string;
-  contact_person: string;
+  contact_person: string | null;
   client_type: 'B2B' | 'B2C' | 'B2G' | 'SEZ' | 'EXPORT';
   credit_limit: number;
   payment_terms: number;
   is_active: boolean;
+  code: string | null;
+  country: string;
 }
 
 export interface ClientCreate {
@@ -36,7 +38,7 @@ export interface ClientCreate {
   country?: string;
   email: string;
   phone: string;
-  contact_person: string;
+  contact_person?: string;
   client_type: 'B2B' | 'B2C' | 'B2G' | 'SEZ' | 'EXPORT';
   credit_limit?: number;
   payment_terms?: number;
@@ -53,15 +55,20 @@ export interface Vendor extends BaseEntity {
   state: string;
   state_code: string;
   pincode: string;
+  country: string;
   email: string;
   phone: string;
-  contact_person: string;
+  contact_person: string | null;
   vendor_type: 'GOODS' | 'SERVICES' | 'BOTH';
   payment_terms: number;
   bank_name: string | null;
   bank_account: string | null;
   bank_ifsc: string | null;
+  bank_branch: string | null;
+  tds_applicable: boolean;
+  tds_section: string | null;
   is_active: boolean;
+  code: string | null;
 }
 
 export interface VendorCreate {
@@ -73,29 +80,50 @@ export interface VendorCreate {
   state: string;
   state_code: string;
   pincode: string;
+  country?: string;
   email: string;
   phone: string;
-  contact_person: string;
+  contact_person?: string;
   vendor_type: 'GOODS' | 'SERVICES' | 'BOTH';
   payment_terms?: number;
   bank_name?: string;
   bank_account?: string;
   bank_ifsc?: string;
+  bank_branch?: string;
+  tds_applicable?: boolean;
+  tds_section?: string;
+  code?: string;
 }
 
 // Purchase Order Types
 export interface PurchaseOrderItem {
   id: number;
   po_id: number;
+  serial_no: number;
   description: string;
-  hsn_sac: string;
+  hsn_sac: string | null;
   quantity: number;
   unit: string;
   rate: number;
   amount: number;
   gst_rate: number;
-  gst_amount: number;
+  cgst_amount: number;
+  sgst_amount: number;
+  igst_amount: number;
+  cess_amount: number;
+  cess_rate: number;
   total_amount: number;
+}
+
+export interface PurchaseOrderItemCreate {
+  serial_no: number;
+  description: string;
+  hsn_sac?: string;
+  quantity: number;
+  unit?: string;
+  rate: number;
+  gst_rate?: number;
+  cess_rate?: number;
 }
 
 export interface PurchaseOrder extends BaseEntity {
@@ -104,13 +132,33 @@ export interface PurchaseOrder extends BaseEntity {
   client_id: number;
   client?: Client;
   reference_number: string | null;
-  subject: string;
+  subject: string | null;
+  discount_percent: number;
+  discount_amount: number;
+  taxable_amount: number;
   items: PurchaseOrderItem[];
   subtotal: number;
-  gst_amount: number;
+  cgst_amount: number;
+  sgst_amount: number;
+  igst_amount: number;
+  cess_amount: number;
   total_amount: number;
   status: 'DRAFT' | 'CONFIRMED' | 'PARTIAL' | 'FULFILLED' | 'CANCELLED';
   notes: string | null;
+  terms_conditions: string | null;
+  valid_until: string | null;
+}
+
+export interface PurchaseOrderCreate {
+  po_date: string;
+  reference_number?: string;
+  client_id: number;
+  subject?: string;
+  discount_percent?: number;
+  notes?: string;
+  terms_conditions?: string;
+  valid_until?: string;
+  items: PurchaseOrderItemCreate[];
 }
 
 // Invoice Types
@@ -186,16 +234,66 @@ export interface Payment extends BaseEntity {
 }
 
 // Ledger Types
+export interface ChartOfAccount extends BaseEntity {
+  code: string;
+  name: string;
+  account_type: 'ASSET' | 'LIABILITY' | 'EQUITY' | 'REVENUE' | 'EXPENSE';
+  account_group: string;
+  parent_id: number | null;
+  description: string | null;
+  is_active: boolean;
+  is_system: boolean;
+}
+
+export interface ChartOfAccountCreate {
+  code: string;
+  name: string;
+  account_type: 'ASSET' | 'LIABILITY' | 'EQUITY' | 'REVENUE' | 'EXPENSE';
+  account_group: string;
+  parent_id?: number;
+  description?: string;
+  is_active?: boolean;
+}
+
 export interface LedgerEntry extends BaseEntity {
   entry_date: string;
-  account_code: string;
-  account_name: string;
-  description: string;
+  voucher_number: string;
+  account_id: number;
   debit: number;
   credit: number;
-  balance: number;
+  narration: string | null;
   reference_type: 'INVOICE' | 'PAYMENT' | 'JOURNAL' | 'OPENING';
   reference_id: number | null;
+  financial_year: string;
+  client_id: number | null;
+  vendor_id: number | null;
+}
+
+export interface LedgerStatement {
+  account_code: string;
+  account_name: string;
+  account_type: string;
+  opening_balance: number;
+  total_debit: number;
+  total_credit: number;
+  closing_balance: number;
+  entries: LedgerEntry[];
+}
+
+export interface TrialBalanceItem {
+  account_code: string;
+  account_name: string;
+  account_type: string;
+  account_group: string;
+  debit: number;
+  credit: number;
+}
+
+export interface TrialBalance {
+  as_on_date: string;
+  accounts: TrialBalanceItem[];
+  total_debit: number;
+  total_credit: number;
 }
 
 // Dashboard Types
@@ -259,4 +357,72 @@ export interface PaginationParams {
 export interface SortParams {
   sort_by: string;
   sort_order: 'asc' | 'desc';
+}
+
+// Settings Types
+export interface CompanySettings extends BaseEntity {
+  company_name: string;
+  company_logo: string | null;
+  gstin: string | null;
+  pan: string;
+  tan: string | null;
+  cin: string | null;
+  address: string;
+  city: string;
+  state: string;
+  state_code: string;
+  pincode: string;
+  country: string;
+  email: string;
+  phone: string;
+  website: string | null;
+  bank_name: string | null;
+  bank_account_number: string | null;
+  bank_ifsc: string | null;
+  bank_branch: string | null;
+  bank_account_type: string | null;
+  financial_year_start_month: number;
+  default_currency: string;
+  default_gst_rate: number;
+  enable_tds: boolean;
+  enable_tcs: boolean;
+  invoice_prefix: string;
+  invoice_terms: string | null;
+  invoice_notes: string | null;
+  enable_multi_currency: boolean;
+  enable_inventory: boolean;
+  is_active: boolean;
+}
+
+export interface CompanySettingsUpdate {
+  company_name?: string;
+  company_logo?: string;
+  gstin?: string;
+  pan?: string;
+  tan?: string;
+  cin?: string;
+  address?: string;
+  city?: string;
+  state?: string;
+  state_code?: string;
+  pincode?: string;
+  country?: string;
+  email?: string;
+  phone?: string;
+  website?: string;
+  bank_name?: string;
+  bank_account_number?: string;
+  bank_ifsc?: string;
+  bank_branch?: string;
+  bank_account_type?: string;
+  financial_year_start_month?: number;
+  default_currency?: string;
+  default_gst_rate?: number;
+  enable_tds?: boolean;
+  enable_tcs?: boolean;
+  invoice_prefix?: string;
+  invoice_terms?: string;
+  invoice_notes?: string;
+  enable_multi_currency?: boolean;
+  enable_inventory?: boolean;
 }

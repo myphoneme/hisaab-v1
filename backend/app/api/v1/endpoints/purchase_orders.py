@@ -10,7 +10,12 @@ from app.db.session import get_db
 from app.models.purchase_order import PurchaseOrder, PurchaseOrderItem, POStatus
 from app.models.client import Client
 from app.models.user import User
-from app.schemas.purchase_order import PurchaseOrderCreate, PurchaseOrderUpdate, PurchaseOrderResponse
+from app.schemas.purchase_order import (
+    PurchaseOrderCreate,
+    PurchaseOrderUpdate,
+    PurchaseOrderResponse,
+    POStatusUpdate,
+)
 from app.schemas.common import PaginatedResponse, Message
 from app.core.security import get_current_user
 from app.services.number_generator import generate_po_number
@@ -195,7 +200,7 @@ async def create_purchase_order(
 @router.patch("/{po_id}/status", response_model=PurchaseOrderResponse)
 async def update_po_status(
     po_id: int,
-    status_update: POStatus,
+    status_data: POStatusUpdate,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
@@ -209,7 +214,7 @@ async def update_po_status(
     if not po:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Purchase order not found")
 
-    po.status = status_update
+    po.status = status_data.status
     await db.commit()
     await db.refresh(po)
     return po

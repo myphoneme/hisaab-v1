@@ -5,6 +5,7 @@ from sqlalchemy import select, func
 from app.models.purchase_order import PurchaseOrder
 from app.models.invoice import Invoice
 from app.models.payment import Payment
+from app.models.ledger import LedgerEntry
 
 
 def get_financial_year() -> str:
@@ -64,6 +65,19 @@ async def generate_payment_number(db: AsyncSession, payment_type: str) -> str:
 
     result = await db.execute(
         select(func.count()).where(Payment.payment_number.like(f"{prefix}%"))
+    )
+    count = result.scalar() or 0
+
+    return f"{prefix}{str(count + 1).zfill(4)}"
+
+
+async def generate_voucher_number(db: AsyncSession, voucher_type: str = "JV") -> str:
+    """Generate unique voucher number for journal entries."""
+    fy = get_financial_year()
+    prefix = f"{voucher_type}/{fy}/"
+
+    result = await db.execute(
+        select(func.count()).where(LedgerEntry.voucher_number.like(f"{prefix}%"))
     )
     count = result.scalar() or 0
 

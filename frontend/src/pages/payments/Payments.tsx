@@ -17,7 +17,8 @@ export function Payments() {
     queryKey: ['payments'],
     queryFn: async () => {
       const response = await paymentApi.getAll();
-      return Array.isArray(response) ? response : [];
+      // Handle paginated response
+      return response?.items || [];
     },
   });
 
@@ -120,10 +121,10 @@ export function Payments() {
                         {payment.payment_mode.replace('_', ' ')}
                       </td>
                       <td className="px-4 py-3 whitespace-nowrap text-right text-sm font-medium text-gray-900">
-                        {formatCurrency(payment.amount)}
+                        {formatCurrency((payment as any).gross_amount || 0)}
                       </td>
                       <td className="px-4 py-3 whitespace-nowrap text-right text-sm text-gray-900">
-                        {formatCurrency(payment.net_amount)}
+                        {formatCurrency(payment.net_amount || 0)}
                       </td>
                       <td className="px-4 py-3 whitespace-nowrap">
                         <span className={`px-2 py-1 text-xs font-semibold rounded-full ${getStatusColor(payment.status)}`}>

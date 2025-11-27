@@ -1,11 +1,11 @@
 {
   "permissions": {
     "allow": [
-      "Bash(alembic revision:*)",
-      "Bash(alembic upgrade:*)",
-      "Bash(python run.py:*)",
-      "Bash(curl:*)",
-      "Bash(cat:*)"
+      "Bash(Select-Object -First 5 ProcessName,Id)",
+      "Bash(tasklist:*)",
+      "Bash(findstr:*)",
+      "Bash(find:*)",
+      "Bash(dir:*)"
     ],
     "deny": [],
     "ask": []

@@ -1,23 +1,28 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Plus, Eye, Trash2, Search, ShoppingCart } from 'lucide-react';
+import { Plus, Edit, Trash2, Search, ShoppingCart, Printer } from 'lucide-react';
+import { toast } from 'sonner';
 import { purchaseOrderApi } from '../../services/api';
-import type { PurchaseOrder } from '../../types';
+import type { PurchaseOrder, PurchaseOrderCreate } from '../../types';
 import { Card, CardContent, CardHeader } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
-import { Badge } from '../../components/ui/Badge';
+import { Select } from '../../components/ui/Select';
 import { formatCurrency } from '../../lib/utils';
+import { PurchaseOrderForm } from './PurchaseOrderForm';
 
 export function PurchaseOrders() {
   const [searchTerm, setSearchTerm] = useState('');
+  const [showForm, setShowForm] = useState(false);
+  const [editingPO, setEditingPO] = useState<PurchaseOrder | null>(null);
   const queryClient = useQueryClient();
 
   const { data: orders, isLoading } = useQuery<PurchaseOrder[]>({
     queryKey: ['purchase-orders'],
     queryFn: async () => {
-      const response = await purchaseOrderApi.getAll();
-      return Array.isArray(response) ? response : [];
+      const response: any = await purchaseOrderApi.getAll();
+      // Backend returns PaginatedResponse with items array
+      return response?.items || [];
     },
   });
 
@@ -25,6 +30,12 @@ export function PurchaseOrders() {
     mutationFn: (id: number) => purchaseOrderApi.delete(id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['purchase-orders'] });
+      toast.success('Purchase order deleted successfully!');
+    },
+    onError: (error: any) => {
+      console.error('Delete PO error:', error);
+      const errorMessage = error.response?.data?.detail || 'Failed to delete purchase order';
+      toast.error(errorMessage);
     },
   });
 
@@ -33,6 +44,55 @@ export function PurchaseOrders() {
       purchaseOrderApi.updateStatus(id, status),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['purchase-orders'] });
+      toast.success('Purchase order status updated successfully!');
+    },
+    onError: (error: any) => {
+      console.error('Update PO status error:', error);
+      const errorMessage = error.response?.data?.detail || 'Failed to update purchase order status';
+      toast.error(errorMessage);
+    },
+  });
+
+  const createMutation = useMutation({
+    mutationFn: (data: PurchaseOrderCreate) => purchaseOrderApi.create(data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['purchase-orders'] });
+      setShowForm(false);
+      toast.success('Purchase order created successfully!');
+    },
+    onError: (error: any) => {
+      console.error('Create PO error:', error);
+      let errorMessage = 'Failed to create purchase order';
+
+      if (error.response?.data?.detail) {
+        const detail = error.response.data.detail;
+        if (Array.isArray(detail)) {
+          errorMessage = detail.map((err: any) => {
+            const field = err.loc?.join('.') || 'Unknown field';
+            return `${field}: ${err.msg}`;
+          }).join('\n');
+        } else if (typeof detail === 'string') {
+          errorMessage = detail;
+        }
+      }
+
+      toast.error(errorMessage);
+    },
+  });
+
+  const updateMutation = useMutation({
+    mutationFn: ({ id, data }: { id: number; data: PurchaseOrderCreate }) =>
+      purchaseOrderApi.update(id, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['purchase-orders'] });
+      setShowForm(false);
+      setEditingPO(null);
+      toast.success('Purchase order updated successfully!');
+    },
+    onError: (error: any) => {
+      console.error('Update PO error:', error);
+      const errorMessage = error.response?.data?.detail || 'Failed to update purchase order';
+      toast.error(errorMessage);
     },
   });
 
@@ -41,21 +101,163 @@ export function PurchaseOrders() {
     order.client?.name.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  const getStatusColor = (status: string) => {
-    const colors: Record<string, string> = {
-      DRAFT: 'bg-gray-100 text-gray-800',
-      CONFIRMED: 'bg-blue-100 text-blue-800',
-      PARTIAL: 'bg-yellow-100 text-yellow-800',
-      FULFILLED: 'bg-green-100 text-green-800',
-      CANCELLED: 'bg-red-100 text-red-800',
-    };
-    return colors[status] || 'bg-gray-100 text-gray-800';
+  const handleEdit = (order: PurchaseOrder) => {
+    setEditingPO(order);
+    setShowForm(true);
   };
 
   const handleDelete = async (id: number) => {
     if (window.confirm('Are you sure you want to delete this purchase order?')) {
       await deleteMutation.mutateAsync(id);
     }
+  };
+
+  const handleStatusChange = (id: number, status: string) => {
+    updateStatusMutation.mutate({ id, status });
+  };
+
+  const handlePrint = (order: PurchaseOrder) => {
+    const printWindow = window.open('', '_blank');
+    if (!printWindow) return;
+
+    const printContent = `
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <title>Purchase Order - ${order.po_number}</title>
+          <style>
+            body { font-family: Arial, sans-serif; padding: 20px; }
+            .header { text-align: center; margin-bottom: 30px; }
+            .header h1 { margin: 0; color: #333; }
+            .details { margin-bottom: 20px; }
+            .details table { width: 100%; }
+            .details td { padding: 5px; }
+            .items { width: 100%; border-collapse: collapse; margin: 20px 0; }
+            .items th, .items td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+            .items th { background-color: #f2f2f2; }
+            .items td.right { text-align: right; }
+            .summary { margin-top: 20px; float: right; width: 300px; }
+            .summary table { width: 100%; }
+            .summary td { padding: 5px; }
+            .summary .total { font-weight: bold; font-size: 16px; border-top: 2px solid #333; }
+            .notes { margin-top: 40px; clear: both; }
+            @media print {
+              button { display: none; }
+            }
+          </style>
+        </head>
+        <body>
+          <button onclick="window.print()" style="margin-bottom: 20px; padding: 10px 20px; background: #4CAF50; color: white; border: none; border-radius: 4px; cursor: pointer;">Print</button>
+
+          <div class="header">
+            <h1>PURCHASE ORDER</h1>
+            <p><strong>PO Number:</strong> ${order.po_number}</p>
+            <p><strong>Date:</strong> ${new Date(order.po_date).toLocaleDateString('en-IN')}</p>
+          </div>
+
+          <div class="details">
+            <table>
+              <tr>
+                <td><strong>Client:</strong> ${order.client?.name || 'N/A'}</td>
+                <td><strong>Reference:</strong> ${order.reference_number || 'N/A'}</td>
+              </tr>
+              <tr>
+                <td colspan="2"><strong>Subject:</strong> ${order.subject || 'N/A'}</td>
+              </tr>
+              ${order.valid_until ? `<tr><td colspan="2"><strong>Valid Until:</strong> ${new Date(order.valid_until).toLocaleDateString('en-IN')}</td></tr>` : ''}
+            </table>
+          </div>
+
+          <table class="items">
+            <thead>
+              <tr>
+                <th>#</th>
+                <th>Description</th>
+                <th>HSN/SAC</th>
+                <th>Qty</th>
+                <th>Unit</th>
+                <th>Rate</th>
+                <th>GST%</th>
+                <th class="right">Amount</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${order.items.map((item, index) => `
+                <tr>
+                  <td>${index + 1}</td>
+                  <td>${item.description}</td>
+                  <td>${item.hsn_sac || '-'}</td>
+                  <td>${Number(item.quantity)}</td>
+                  <td>${item.unit}</td>
+                  <td class="right">₹${Number(item.rate).toFixed(2)}</td>
+                  <td>${Number(item.gst_rate)}%</td>
+                  <td class="right">₹${Number(item.amount).toFixed(2)}</td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+
+          <div class="summary">
+            <table>
+              <tr>
+                <td>Subtotal:</td>
+                <td class="right">₹${Number(order.subtotal).toFixed(2)}</td>
+              </tr>
+              ${Number(order.discount_amount) > 0 ? `
+                <tr>
+                  <td>Discount (${Number(order.discount_percent)}%):</td>
+                  <td class="right">- ₹${Number(order.discount_amount).toFixed(2)}</td>
+                </tr>
+              ` : ''}
+              <tr>
+                <td>CGST:</td>
+                <td class="right">₹${Number(order.cgst_amount).toFixed(2)}</td>
+              </tr>
+              <tr>
+                <td>SGST:</td>
+                <td class="right">₹${Number(order.sgst_amount).toFixed(2)}</td>
+              </tr>
+              <tr>
+                <td>IGST:</td>
+                <td class="right">₹${Number(order.igst_amount).toFixed(2)}</td>
+              </tr>
+              ${Number(order.cess_amount) > 0 ? `
+                <tr>
+                  <td>Cess:</td>
+                  <td class="right">₹${Number(order.cess_amount).toFixed(2)}</td>
+                </tr>
+              ` : ''}
+              <tr class="total">
+                <td>Total:</td>
+                <td class="right">₹${Number(order.total_amount).toFixed(2)}</td>
+              </tr>
+            </table>
+          </div>
+
+          ${order.notes ? `
+            <div class="notes">
+              <h3>Notes:</h3>
+              <p>${order.notes}</p>
+            </div>
+          ` : ''}
+
+          ${order.terms_conditions ? `
+            <div class="notes">
+              <h3>Terms & Conditions:</h3>
+              <p>${order.terms_conditions}</p>
+            </div>
+          ` : ''}
+        </body>
+      </html>
+    `;
+
+    printWindow.document.write(printContent);
+    printWindow.document.close();
+  };
+
+  const handleCloseForm = () => {
+    setShowForm(false);
+    setEditingPO(null);
   };
 
   return (
@@ -65,7 +267,7 @@ export function PurchaseOrders() {
           <h1 className="text-2xl font-bold text-gray-900">Purchase Orders</h1>
           <p className="text-gray-500 mt-1">Manage purchase orders from clients</p>
         </div>
-        <Button>
+        <Button onClick={() => setShowForm(true)}>
           <Plus className="h-4 w-4 mr-2" />
           Create PO
         </Button>
@@ -125,17 +327,37 @@ export function PurchaseOrders() {
                         {formatCurrency(order.total_amount)}
                       </td>
                       <td className="px-4 py-3 whitespace-nowrap">
-                        <span className={`px-2 py-1 text-xs font-semibold rounded-full ${getStatusColor(order.status)}`}>
-                          {order.status}
-                        </span>
+                        <Select
+                          value={order.status}
+                          onChange={(e) => handleStatusChange(order.id, e.target.value)}
+                          className="text-xs"
+                        >
+                          <option value="DRAFT">Draft</option>
+                          <option value="CONFIRMED">Confirmed</option>
+                          <option value="PARTIAL">Partially Fulfilled</option>
+                          <option value="FULFILLED">Fulfilled</option>
+                          <option value="CANCELLED">Cancelled</option>
+                        </Select>
                       </td>
                       <td className="px-4 py-3 whitespace-nowrap text-right text-sm">
-                        <button className="text-blue-600 hover:text-blue-900 mr-3">
-                          <Eye className="h-4 w-4" />
+                        <button
+                          onClick={() => handleEdit(order)}
+                          className="text-blue-600 hover:text-blue-900 mr-3"
+                          title="Edit"
+                        >
+                          <Edit className="h-4 w-4" />
+                        </button>
+                        <button
+                          onClick={() => handlePrint(order)}
+                          className="text-green-600 hover:text-green-900 mr-3"
+                          title="Print"
+                        >
+                          <Printer className="h-4 w-4" />
                         </button>
                         <button
                           onClick={() => handleDelete(order.id)}
                           className="text-red-600 hover:text-red-900"
+                          title="Delete"
                         >
                           <Trash2 className="h-4 w-4" />
                         </button>
@@ -148,6 +370,21 @@ export function PurchaseOrders() {
           )}
         </CardContent>
       </Card>
+
+      {showForm && (
+        <PurchaseOrderForm
+          purchaseOrder={editingPO}
+          onSubmit={(data) => {
+            if (editingPO) {
+              updateMutation.mutate({ id: editingPO.id, data });
+            } else {
+              createMutation.mutate(data);
+            }
+          }}
+          onClose={handleCloseForm}
+          isLoading={createMutation.isPending || updateMutation.isPending}
+        />
+      )}
     </div>
   );
 }

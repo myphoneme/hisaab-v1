@@ -1,6 +1,7 @@
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ReactQueryDevtools } from '@tanstack/react-query-devtools';
+import { Toaster } from 'sonner';
 import { Layout } from './components/layout/Layout';
 import { Dashboard } from './pages/dashboard/Dashboard';
 import { Login } from './pages/auth/Login';
@@ -20,44 +21,13 @@ const queryClient = new QueryClient({
 import { Clients } from './pages/clients/Clients';
 import { Vendors } from './pages/vendors/Vendors';
 import { Invoices } from './pages/invoices/Invoices';
+import { InvoiceForm } from './pages/invoices/InvoiceForm';
 import { Payments } from './pages/payments/Payments';
 import { PurchaseOrders } from './pages/purchase-orders/PurchaseOrders';
-
-function LedgerPage() {
-  return (
-    <div>
-      <h1 className="text-2xl font-bold text-gray-900">Ledger</h1>
-      <p className="text-gray-500 mt-1">View accounting ledger entries.</p>
-    </div>
-  );
-}
-
-function GSTReportsPage() {
-  return (
-    <div>
-      <h1 className="text-2xl font-bold text-gray-900">GST Reports</h1>
-      <p className="text-gray-500 mt-1">Generate GST reports and returns data.</p>
-    </div>
-  );
-}
-
-function ReportsPage() {
-  return (
-    <div>
-      <h1 className="text-2xl font-bold text-gray-900">Reports</h1>
-      <p className="text-gray-500 mt-1">View business reports and analytics.</p>
-    </div>
-  );
-}
-
-function SettingsPage() {
-  return (
-    <div>
-      <h1 className="text-2xl font-bold text-gray-900">Settings</h1>
-      <p className="text-gray-500 mt-1">Configure application settings.</p>
-    </div>
-  );
-}
+import { Ledger } from './pages/ledger/Ledger';
+import { GSTReports } from './pages/reports/GSTReports';
+import { Reports } from './pages/reports/Reports';
+import { Settings } from './pages/settings/Settings';
 
 function App() {
   return (
@@ -76,15 +46,18 @@ function App() {
               <Route path="vendors" element={<Vendors />} />
               <Route path="purchase-orders" element={<PurchaseOrders />} />
               <Route path="invoices" element={<Invoices />} />
+              <Route path="invoices/new" element={<InvoiceForm />} />
+              <Route path="invoices/:id/edit" element={<InvoiceForm />} />
               <Route path="payments" element={<Payments />} />
-              <Route path="ledger" element={<LedgerPage />} />
-              <Route path="reports/gst" element={<GSTReportsPage />} />
-              <Route path="reports" element={<ReportsPage />} />
-              <Route path="settings" element={<SettingsPage />} />
+              <Route path="ledger" element={<Ledger />} />
+              <Route path="reports" element={<Reports />} />
+              <Route path="reports/gst" element={<GSTReports />} />
+              <Route path="settings" element={<Settings />} />
             </Route>
           </Route>
         </Routes>
       </BrowserRouter>
+      <Toaster position="top-right" richColors />
       <ReactQueryDevtools initialIsOpen={false} />
     </QueryClientProvider>
   );

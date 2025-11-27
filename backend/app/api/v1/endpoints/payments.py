@@ -145,6 +145,90 @@ async def create_payment(
     return result.scalar_one()
 
 
+@router.patch("/{payment_id}", response_model=PaymentResponse)
+async def update_payment(
+    payment_id: int,
+    payment_data: PaymentUpdate,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Update a payment."""
+    result = await db.execute(
+        select(Payment)
+        .options(selectinload(Payment.client), selectinload(Payment.vendor))
+        .where(Payment.id == payment_id)
+    )
+    payment = result.scalar_one_or_none()
+    if not payment:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Payment not found")
+
+    # Store old values for invoice update rollback if needed
+    old_invoice_id = payment.invoice_id
+    old_net_amount = payment.net_amount
+
+    # Update fields
+    for field, value in payment_data.model_dump(exclude_unset=True).items():
+        if field not in ['gross_amount', 'tds_amount', 'tcs_amount']:
+            setattr(payment, field, value)
+        elif value is not None:
+            setattr(payment, field, value)
+
+    # Recalculate net amount if amounts changed
+    if payment_data.gross_amount is not None or payment_data.tds_amount is not None or payment_data.tcs_amount is not None:
+        payment.net_amount = payment.gross_amount - payment.tds_amount + payment.tcs_amount
+
+    # Handle invoice update if invoice_id changed
+    if payment_data.invoice_id is not None and payment_data.invoice_id != old_invoice_id:
+        # Reverse old invoice update
+        if old_invoice_id:
+            old_invoice_result = await db.execute(select(Invoice).where(Invoice.id == old_invoice_id))
+            old_invoice = old_invoice_result.scalar_one_or_none()
+            if old_invoice:
+                old_invoice.amount_paid -= old_net_amount
+                old_invoice.amount_due = old_invoice.amount_after_tds - old_invoice.amount_paid
+                if old_invoice.amount_due >= old_invoice.amount_after_tds:
+                    old_invoice.status = InvoiceStatus.SENT
+                else:
+                    old_invoice.status = InvoiceStatus.PARTIAL
+
+        # Apply new invoice update
+        if payment.invoice_id:
+            new_invoice_result = await db.execute(select(Invoice).where(Invoice.id == payment.invoice_id))
+            new_invoice = new_invoice_result.scalar_one_or_none()
+            if new_invoice:
+                new_invoice.amount_paid += payment.net_amount
+                new_invoice.amount_due = new_invoice.amount_after_tds - new_invoice.amount_paid
+                if new_invoice.amount_due <= 0:
+                    new_invoice.status = InvoiceStatus.PAID
+                elif new_invoice.amount_paid > 0:
+                    new_invoice.status = InvoiceStatus.PARTIAL
+    # If net amount changed but invoice_id same, update the invoice
+    elif old_invoice_id and payment.net_amount != old_net_amount:
+        invoice_result = await db.execute(select(Invoice).where(Invoice.id == old_invoice_id))
+        invoice = invoice_result.scalar_one_or_none()
+        if invoice:
+            # Remove old amount and add new amount
+            invoice.amount_paid = invoice.amount_paid - old_net_amount + payment.net_amount
+            invoice.amount_due = invoice.amount_after_tds - invoice.amount_paid
+            if invoice.amount_due <= 0:
+                invoice.status = InvoiceStatus.PAID
+            elif invoice.amount_paid > 0:
+                invoice.status = InvoiceStatus.PARTIAL
+            else:
+                invoice.status = InvoiceStatus.SENT
+
+    await db.commit()
+    await db.refresh(payment)
+
+    # Reload with relationships
+    result = await db.execute(
+        select(Payment)
+        .options(selectinload(Payment.client), selectinload(Payment.vendor))
+        .where(Payment.id == payment.id)
+    )
+    return result.scalar_one()
+
+
 @router.delete("/{payment_id}", response_model=Message)
 async def delete_payment(
     payment_id: int,

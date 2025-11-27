@@ -18,30 +18,88 @@ const VENDOR_TYPES = [
   { value: 'BOTH', label: 'Both' },
 ];
 
+const INDIAN_STATES = [
+  { code: '01', name: 'Jammu & Kashmir' },
+  { code: '02', name: 'Himachal Pradesh' },
+  { code: '03', name: 'Punjab' },
+  { code: '04', name: 'Chandigarh' },
+  { code: '05', name: 'Uttarakhand' },
+  { code: '06', name: 'Haryana' },
+  { code: '07', name: 'Delhi' },
+  { code: '08', name: 'Rajasthan' },
+  { code: '09', name: 'Uttar Pradesh' },
+  { code: '10', name: 'Bihar' },
+  { code: '11', name: 'Sikkim' },
+  { code: '12', name: 'Arunachal Pradesh' },
+  { code: '13', name: 'Nagaland' },
+  { code: '14', name: 'Manipur' },
+  { code: '15', name: 'Mizoram' },
+  { code: '16', name: 'Tripura' },
+  { code: '17', name: 'Meghalaya' },
+  { code: '18', name: 'Assam' },
+  { code: '19', name: 'West Bengal' },
+  { code: '20', name: 'Jharkhand' },
+  { code: '21', name: 'Odisha' },
+  { code: '22', name: 'Chhattisgarh' },
+  { code: '23', name: 'Madhya Pradesh' },
+  { code: '24', name: 'Gujarat' },
+  { code: '26', name: 'Dadra & Nagar Haveli and Daman & Diu' },
+  { code: '27', name: 'Maharashtra' },
+  { code: '28', name: 'Andhra Pradesh(Old)' },
+  { code: '29', name: 'Karnataka' },
+  { code: '30', name: 'Goa' },
+  { code: '31', name: 'Lakshadweep' },
+  { code: '32', name: 'Kerala' },
+  { code: '33', name: 'Tamil Nadu' },
+  { code: '34', name: 'Puducherry' },
+  { code: '35', name: 'Andaman & Nicobar Islands' },
+  { code: '36', name: 'Telangana' },
+  { code: '37', name: 'Andhra Pradesh(New)' },
+];
+
 export function VendorForm({ vendor, onSubmit, onClose, isLoading }: VendorFormProps) {
-  const { register, handleSubmit, formState: { errors } } = useForm<VendorCreate>({
+  const { register, handleSubmit, formState: { errors }, setValue } = useForm<VendorCreate>({
     defaultValues: vendor ? {
       name: vendor.name,
-      gstin: vendor.gstin || '',
+      gstin: vendor.gstin || undefined,
       pan: vendor.pan,
       address: vendor.address,
       city: vendor.city,
       state: vendor.state,
       state_code: vendor.state_code,
       pincode: vendor.pincode,
+      country: 'India',
       email: vendor.email,
       phone: vendor.phone,
-      contact_person: vendor.contact_person,
+      contact_person: vendor.contact_person || undefined,
       vendor_type: vendor.vendor_type,
       payment_terms: vendor.payment_terms,
-      bank_name: vendor.bank_name || '',
-      bank_account: vendor.bank_account || '',
-      bank_ifsc: vendor.bank_ifsc || '',
+      bank_name: vendor.bank_name || undefined,
+      bank_account: vendor.bank_account || undefined,
+      bank_ifsc: vendor.bank_ifsc || undefined,
     } : {
       vendor_type: 'BOTH' as const,
       payment_terms: 30,
+      country: 'India',
     },
   });
+
+  const handleFormSubmit = (data: VendorCreate) => {
+    // Ensure country is set and handle optional fields
+    const submitData: VendorCreate = {
+      ...data,
+      country: data.country || 'India',
+      // Convert empty strings to undefined for optional fields
+      gstin: data.gstin?.trim() || undefined,
+      contact_person: data.contact_person?.trim() || undefined,
+      bank_name: data.bank_name?.trim() || undefined,
+      bank_account: data.bank_account?.trim() || undefined,
+      bank_ifsc: data.bank_ifsc?.trim() || undefined,
+      code: data.code?.trim() || undefined,
+    };
+    console.log('Submitting vendor data:', submitData);
+    onSubmit(submitData);
+  };
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
@@ -55,7 +113,7 @@ export function VendorForm({ vendor, onSubmit, onClose, isLoading }: VendorFormP
           </button>
         </div>
 
-        <form onSubmit={handleSubmit(onSubmit)} className="p-6">
+        <form onSubmit={handleSubmit(handleFormSubmit)} className="p-6">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div className="md:col-span-2">
               <label className="block text-sm font-medium text-gray-700 mb-1">Vendor Name *</label>
@@ -64,8 +122,8 @@ export function VendorForm({ vendor, onSubmit, onClose, isLoading }: VendorFormP
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Contact Person *</label>
-              <Input {...register('contact_person', { required: true })} />
+              <label className="block text-sm font-medium text-gray-700 mb-1">Contact Person</label>
+              <Input {...register('contact_person')} placeholder="Enter contact person name" />
             </div>
 
             <div>
@@ -89,12 +147,33 @@ export function VendorForm({ vendor, onSubmit, onClose, isLoading }: VendorFormP
 
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">PAN *</label>
-              <Input {...register('pan', { required: true })} maxLength={10} />
+              <Input
+                {...register('pan', {
+                  required: 'PAN is required',
+                  pattern: {
+                    value: /^[A-Z]{5}[0-9]{4}[A-Z]{1}$/,
+                    message: 'Invalid PAN format',
+                  },
+                })}
+                placeholder="ABCDE1234F"
+                maxLength={10}
+              />
+              {errors.pan && <p className="text-red-500 text-sm mt-1">{errors.pan.message}</p>}
             </div>
 
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">GSTIN</label>
-              <Input {...register('gstin')} maxLength={15} />
+              <Input
+                {...register('gstin', {
+                  pattern: {
+                    value: /^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$/,
+                    message: 'Invalid GSTIN format',
+                  },
+                })}
+                placeholder="22AAAAA0000A1Z5"
+                maxLength={15}
+              />
+              {errors.gstin && <p className="text-red-500 text-sm mt-1">{errors.gstin.message}</p>}
             </div>
 
             <div className="md:col-span-2">
@@ -109,17 +188,57 @@ export function VendorForm({ vendor, onSubmit, onClose, isLoading }: VendorFormP
 
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">State *</label>
-              <Input {...register('state', { required: true })} />
+              <Select
+                {...register('state', {
+                  required: 'State is required',
+                  onChange: (e) => {
+                    const selectedState = INDIAN_STATES.find(s => s.name === e.target.value);
+                    if (selectedState) {
+                      setValue('state_code', selectedState.code, { shouldValidate: true });
+                    }
+                  },
+                })}
+              >
+                <option value="">Select State</option>
+                {INDIAN_STATES.map((state) => (
+                  <option key={state.code} value={state.name}>
+                    {state.name}
+                  </option>
+                ))}
+              </Select>
+              {errors.state && <p className="text-red-500 text-sm mt-1">{errors.state.message}</p>}
             </div>
 
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">State Code *</label>
-              <Input {...register('state_code', { required: true })} maxLength={2} />
+              <Input
+                {...register('state_code', {
+                  required: 'State code is required',
+                  pattern: {
+                    value: /^\d{2}$/,
+                    message: 'State code must be exactly 2 digits',
+                  },
+                })}
+                placeholder="Enter state code"
+                maxLength={2}
+              />
+              {errors.state_code && <p className="text-red-500 text-sm mt-1">{errors.state_code.message}</p>}
             </div>
 
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Pincode *</label>
-              <Input {...register('pincode', { required: true })} maxLength={6} />
+              <Input
+                {...register('pincode', {
+                  required: 'Pincode is required',
+                  pattern: {
+                    value: /^[0-9]{6}$/,
+                    message: 'Invalid pincode',
+                  },
+                })}
+                placeholder="Enter pincode"
+                maxLength={6}
+              />
+              {errors.pincode && <p className="text-red-500 text-sm mt-1">{errors.pincode.message}</p>}
             </div>
 
             <div>

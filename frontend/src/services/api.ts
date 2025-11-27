@@ -98,10 +98,9 @@ export const invoiceApi = {
   getAll: (params?: Record<string, unknown>) => api.get('/invoices', params),
   getById: (id: number) => api.get(`/invoices/${id}`),
   create: (data: unknown) => api.post('/invoices', data),
-  update: (id: number, data: unknown) => api.put(`/invoices/${id}`, data),
+  update: (id: number, data: unknown) => api.patch(`/invoices/${id}`, data),
   delete: (id: number) => api.delete(`/invoices/${id}`),
-  updateStatus: (id: number, status: string) => api.patch(`/invoices/${id}/status`, { status }),
-  generatePdf: (id: number) => api.get(`/invoices/${id}/pdf`),
+  updateStatus: (id: number, status: string) => api.patch(`/invoices/${id}/status`, status),
 };
 
 // Payment API
@@ -109,16 +108,25 @@ export const paymentApi = {
   getAll: (params?: Record<string, unknown>) => api.get('/payments', params),
   getById: (id: number) => api.get(`/payments/${id}`),
   create: (data: unknown) => api.post('/payments', data),
-  update: (id: number, data: unknown) => api.put(`/payments/${id}`, data),
+  update: (id: number, data: unknown) => api.patch(`/payments/${id}`, data),
   delete: (id: number) => api.delete(`/payments/${id}`),
 };
 
 // Ledger API
 export const ledgerApi = {
-  getEntries: (params?: Record<string, unknown>) => api.get('/ledger', params),
+  // Chart of Accounts
+  getAccounts: (params?: Record<string, unknown>) => api.get('/ledger/accounts', params),
+  getAccountById: (id: number) => api.get(`/ledger/accounts/${id}`),
+  createAccount: (data: unknown) => api.post('/ledger/accounts', data),
+  updateAccount: (id: number, data: unknown) => api.patch(`/ledger/accounts/${id}`, data),
+  deleteAccount: (id: number) => api.delete(`/ledger/accounts/${id}`),
+  // Ledger Entries
+  getEntries: (params?: Record<string, unknown>) => api.get('/ledger/entries', params),
+  createJournalEntry: (data: unknown) => api.post('/ledger/journal-entry', data),
+  // Reports
+  getStatement: (accountId: number, params?: Record<string, unknown>) =>
+    api.get(`/ledger/statement/${accountId}`, params),
   getTrialBalance: (params?: Record<string, unknown>) => api.get('/ledger/trial-balance', params),
-  getProfitLoss: (params?: Record<string, unknown>) => api.get('/ledger/profit-loss', params),
-  getBalanceSheet: (params?: Record<string, unknown>) => api.get('/ledger/balance-sheet', params),
 };
 
 // Reports API
@@ -127,6 +135,16 @@ export const reportsApi = {
   getGSTSummary: (params?: Record<string, unknown>) => api.get('/reports/gst-summary', params),
   getTDSSummary: (params?: Record<string, unknown>) => api.get('/reports/tds-summary', params),
   getAgingReport: (params?: Record<string, unknown>) => api.get('/reports/aging', params),
+  getGSTR1: (params?: Record<string, unknown>) => api.get('/reports/gstr-1', params),
+  getGSTR3B: (params?: Record<string, unknown>) => api.get('/reports/gstr-3b', params),
+};
+
+// Settings API
+export const settingsApi = {
+  get: () => api.get('/settings'),
+  create: (data: unknown) => api.post('/settings', data),
+  update: (data: unknown) => api.patch('/settings', data),
+  updateById: (id: number, data: unknown) => api.patch(`/settings/${id}`, data),
 };
 
 // Auth API

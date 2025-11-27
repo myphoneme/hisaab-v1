@@ -1,6 +1,7 @@
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Plus, Eye, Trash2, Search, FileText } from 'lucide-react';
+import { Plus, Eye, Trash2, Search, FileText, Edit } from 'lucide-react';
 import { invoiceApi } from '../../services/api';
 import type { Invoice } from '../../types';
 import { Card, CardContent, CardHeader } from '../../components/ui/Card';
@@ -10,6 +11,7 @@ import { Badge } from '../../components/ui/Badge';
 import { formatCurrency } from '../../lib/utils';
 
 export function Invoices() {
+  const navigate = useNavigate();
   const [searchTerm, setSearchTerm] = useState('');
   const queryClient = useQueryClient();
 
@@ -17,20 +19,13 @@ export function Invoices() {
     queryKey: ['invoices'],
     queryFn: async () => {
       const response = await invoiceApi.getAll();
-      return Array.isArray(response) ? response : [];
+      // Handle paginated response
+      return response?.items || [];
     },
   });
 
   const deleteMutation = useMutation({
     mutationFn: (id: number) => invoiceApi.delete(id),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['invoices'] });
-    },
-  });
-
-  const updateStatusMutation = useMutation({
-    mutationFn: ({ id, status }: { id: number; status: string }) =>
-      invoiceApi.updateStatus(id, status),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['invoices'] });
     },
@@ -67,7 +62,7 @@ export function Invoices() {
           <h1 className="text-2xl font-bold text-gray-900">Invoices</h1>
           <p className="text-gray-500 mt-1">Manage sales and purchase invoices</p>
         </div>
-        <Button>
+        <Button onClick={() => navigate('/invoices/new')}>
           <Plus className="h-4 w-4 mr-2" />
           Create Invoice
         </Button>
@@ -138,12 +133,24 @@ export function Invoices() {
                         </span>
                       </td>
                       <td className="px-4 py-3 whitespace-nowrap text-right text-sm">
-                        <button className="text-blue-600 hover:text-blue-900 mr-3">
+                        <button
+                          onClick={() => navigate(`/invoices/${invoice.id}`)}
+                          className="text-blue-600 hover:text-blue-900 mr-3"
+                          title="View"
+                        >
                           <Eye className="h-4 w-4" />
+                        </button>
+                        <button
+                          onClick={() => navigate(`/invoices/${invoice.id}/edit`)}
+                          className="text-green-600 hover:text-green-900 mr-3"
+                          title="Edit"
+                        >
+                          <Edit className="h-4 w-4" />
                         </button>
                         <button
                           onClick={() => handleDelete(invoice.id)}
                           className="text-red-600 hover:text-red-900"
+                          title="Delete"
                         >
                           <Trash2 className="h-4 w-4" />
                         </button>

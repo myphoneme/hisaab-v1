@@ -64,20 +64,21 @@ export function ClientForm({ client, onSubmit, onClose, isLoading }: ClientFormP
     register,
     handleSubmit,
     formState: { errors },
-    watch,
+    setValue,
   } = useForm<ClientCreate>({
     defaultValues: client ? {
       name: client.name,
-      gstin: client.gstin || '',
+      gstin: client.gstin || undefined,
       pan: client.pan,
       address: client.address,
       city: client.city,
       state: client.state,
       state_code: client.state_code,
       pincode: client.pincode,
+      country: 'India',
       email: client.email,
       phone: client.phone,
-      contact_person: client.contact_person,
+      contact_person: client.contact_person || undefined,
       client_type: client.client_type,
       credit_limit: client.credit_limit,
       payment_terms: client.payment_terms,
@@ -85,8 +86,23 @@ export function ClientForm({ client, onSubmit, onClose, isLoading }: ClientFormP
       client_type: 'B2B' as const,
       credit_limit: 0,
       payment_terms: 30,
+      country: 'India',
     },
   });
+
+  const handleFormSubmit = (data: ClientCreate) => {
+    // Ensure country is set and handle optional fields
+    const submitData: ClientCreate = {
+      ...data,
+      country: data.country || 'India',
+      // Convert empty strings to undefined for optional fields
+      gstin: data.gstin?.trim() || undefined,
+      contact_person: data.contact_person?.trim() || undefined,
+      code: data.code?.trim() || undefined,
+    };
+    console.log('Submitting client data:', submitData);
+    onSubmit(submitData);
+  };
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
@@ -100,7 +116,7 @@ export function ClientForm({ client, onSubmit, onClose, isLoading }: ClientFormP
           </button>
         </div>
 
-        <form onSubmit={handleSubmit(onSubmit)} className="p-6">
+        <form onSubmit={handleSubmit(handleFormSubmit)} className="p-6">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div className="md:col-span-2">
               <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -117,10 +133,10 @@ export function ClientForm({ client, onSubmit, onClose, isLoading }: ClientFormP
 
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
-                Contact Person *
+                Contact Person
               </label>
               <Input
-                {...register('contact_person', { required: 'Contact person is required' })}
+                {...register('contact_person')}
                 placeholder="Enter contact person name"
               />
               {errors.contact_person && (
@@ -244,16 +260,16 @@ export function ClientForm({ client, onSubmit, onClose, isLoading }: ClientFormP
                 State *
               </label>
               <Select
-                {...register('state', { required: 'State is required' })}
-                onChange={(e) => {
-                  const selectedState = INDIAN_STATES.find(s => s.name === e.target.value);
-                  if (selectedState) {
-                    const stateCodeInput = document.querySelector<HTMLInputElement>('[name="state_code"]');
-                    if (stateCodeInput) {
-                      stateCodeInput.value = selectedState.code;
+                {...register('state', {
+                  required: 'State is required',
+                  onChange: (e) => {
+                    const selectedState = INDIAN_STATES.find(s => s.name === e.target.value);
+                    if (selectedState) {
+                      // Use setValue to properly update react-hook-form state
+                      setValue('state_code', selectedState.code, { shouldValidate: true });
                     }
-                  }
-                }}
+                  },
+                })}
               >
                 <option value="">Select State</option>
                 {INDIAN_STATES.map((state) => (
@@ -272,7 +288,13 @@ export function ClientForm({ client, onSubmit, onClose, isLoading }: ClientFormP
                 State Code *
               </label>
               <Input
-                {...register('state_code', { required: 'State code is required' })}
+                {...register('state_code', {
+                  required: 'State code is required',
+                  pattern: {
+                    value: /^\d{2}$/,
+                    message: 'State code must be exactly 2 digits',
+                  },
+                })}
                 placeholder="Enter state code"
                 maxLength={2}
               />

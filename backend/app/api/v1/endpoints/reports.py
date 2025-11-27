@@ -286,3 +286,296 @@ async def get_aging_report(
         },
         "details": details,
     }
+
+
+@router.get("/gstr-1")
+async def get_gstr1_report(
+    from_date: date = Query(...),
+    to_date: date = Query(...),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Get GSTR-1 report format for the period."""
+    # Get all sales invoices and credit notes for the period
+    result = await db.execute(
+        select(Invoice)
+        .options(selectinload(Invoice.items), selectinload(Invoice.client))
+        .where(Invoice.invoice_type.in_([InvoiceType.SALES, InvoiceType.CREDIT_NOTE]))
+        .where(Invoice.invoice_date >= from_date)
+        .where(Invoice.invoice_date <= to_date)
+        .where(Invoice.status != InvoiceStatus.CANCELLED)
+    )
+    invoices = result.scalars().all()
+
+    # B2B Supplies (with GSTIN)
+    b2b_supplies = []
+    # B2C Large (> 2.5 lakh)
+    b2c_large = []
+    # B2C Small (< 2.5 lakh)
+    b2c_small_summary = {}
+    # Credit/Debit Notes
+    credit_debit_notes = []
+    # HSN Summary
+    hsn_summary = {}
+
+    for inv in invoices:
+        client = inv.client
+
+        # Skip if no client (shouldn't happen for sales)
+        if not client:
+            continue
+
+        if inv.invoice_type == InvoiceType.CREDIT_NOTE:
+            # Credit Notes
+            credit_debit_notes.append({
+                "note_type": "C",  # C for Credit Note
+                "note_number": inv.invoice_number,
+                "note_date": str(inv.invoice_date),
+                "invoice_number": "",  # Original invoice number
+                "invoice_date": "",
+                "party_name": client.name,
+                "gstin": client.gstin or "",
+                "place_of_supply": inv.place_of_supply,
+                "taxable_value": float(inv.taxable_amount),
+                "cgst": float(inv.cgst_amount),
+                "sgst": float(inv.sgst_amount),
+                "igst": float(inv.igst_amount),
+                "cess": float(inv.cess_amount),
+            })
+            continue
+
+        # For regular sales invoices
+        if client.gstin and client.client_type in ['B2B', 'B2G']:
+            # B2B Supply (registered)
+            b2b_supplies.append({
+                "invoice_number": inv.invoice_number,
+                "invoice_date": str(inv.invoice_date),
+                "party_name": client.name,
+                "gstin": client.gstin,
+                "place_of_supply": inv.place_of_supply,
+                "reverse_charge": "Y" if inv.reverse_charge else "N",
+                "invoice_type": "Regular",
+                "taxable_value": float(inv.taxable_amount),
+                "cgst": float(inv.cgst_amount),
+                "sgst": float(inv.sgst_amount),
+                "igst": float(inv.igst_amount),
+                "cess": float(inv.cess_amount),
+                "total_value": float(inv.total_amount),
+            })
+        elif inv.total_amount > Decimal('250000'):
+            # B2C Large (> 2.5 lakh)
+            b2c_large.append({
+                "invoice_number": inv.invoice_number,
+                "invoice_date": str(inv.invoice_date),
+                "place_of_supply": inv.place_of_supply,
+                "taxable_value": float(inv.taxable_amount),
+                "cgst": float(inv.cgst_amount),
+                "sgst": float(inv.sgst_amount),
+                "igst": float(inv.igst_amount),
+                "cess": float(inv.cess_amount),
+                "total_value": float(inv.total_amount),
+            })
+        else:
+            # B2C Small (< 2.5 lakh) - summarized by state and rate
+            key = (inv.place_of_supply, "CGST/SGST" if not inv.is_igst else "IGST")
+            if key not in b2c_small_summary:
+                b2c_small_summary[key] = {
+                    "place_of_supply": inv.place_of_supply,
+                    "type": key[1],
+                    "taxable_value": Decimal('0'),
+                    "cgst": Decimal('0'),
+                    "sgst": Decimal('0'),
+                    "igst": Decimal('0'),
+                    "cess": Decimal('0'),
+                }
+            b2c_small_summary[key]["taxable_value"] += inv.taxable_amount
+            b2c_small_summary[key]["cgst"] += inv.cgst_amount
+            b2c_small_summary[key]["sgst"] += inv.sgst_amount
+            b2c_small_summary[key]["igst"] += inv.igst_amount
+            b2c_small_summary[key]["cess"] += inv.cess_amount
+
+        # HSN Summary
+        for item in inv.items:
+            hsn = item.hsn_sac or "N/A"
+            gst_rate = item.gst_rate
+            key = (hsn, float(gst_rate))
+
+            if key not in hsn_summary:
+                hsn_summary[key] = {
+                    "hsn_code": hsn,
+                    "uqc": item.unit,
+                    "quantity": Decimal('0'),
+                    "taxable_value": Decimal('0'),
+                    "cgst": Decimal('0'),
+                    "sgst": Decimal('0'),
+                    "igst": Decimal('0'),
+                    "cess": Decimal('0'),
+                    "rate": float(gst_rate),
+                }
+            hsn_summary[key]["quantity"] += item.quantity
+            hsn_summary[key]["taxable_value"] += item.taxable_amount
+            hsn_summary[key]["cgst"] += item.cgst_amount
+            hsn_summary[key]["sgst"] += item.sgst_amount
+            hsn_summary[key]["igst"] += item.igst_amount
+            hsn_summary[key]["cess"] += item.cess_amount
+
+    # Convert b2c_small_summary and hsn_summary to lists
+    b2c_small = [
+        {
+            **v,
+            "taxable_value": float(v["taxable_value"]),
+            "cgst": float(v["cgst"]),
+            "sgst": float(v["sgst"]),
+            "igst": float(v["igst"]),
+            "cess": float(v["cess"]),
+        }
+        for v in b2c_small_summary.values()
+    ]
+
+    hsn_list = [
+        {
+            **v,
+            "quantity": float(v["quantity"]),
+            "taxable_value": float(v["taxable_value"]),
+            "cgst": float(v["cgst"]),
+            "sgst": float(v["sgst"]),
+            "igst": float(v["igst"]),
+            "cess": float(v["cess"]),
+        }
+        for v in hsn_summary.values()
+    ]
+
+    return {
+        "period": f"{from_date} to {to_date}",
+        "gstin": "",  # Should be fetched from company settings
+        "legal_name": "",  # Should be fetched from company settings
+        "b2b_supplies": b2b_supplies,
+        "b2c_large": b2c_large,
+        "b2c_small": b2c_small,
+        "credit_debit_notes": credit_debit_notes,
+        "hsn_summary": hsn_list,
+        "document_summary": {
+            "total_invoices": len([inv for inv in invoices if inv.invoice_type == InvoiceType.SALES]),
+            "total_credit_notes": len([inv for inv in invoices if inv.invoice_type == InvoiceType.CREDIT_NOTE]),
+            "cancelled": 0,
+        }
+    }
+
+
+@router.get("/gstr-3b")
+async def get_gstr3b_report(
+    from_date: date = Query(...),
+    to_date: date = Query(...),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Get GSTR-3B report format for the period."""
+    # Outward Supplies (Sales)
+    sales_result = await db.execute(
+        select(
+            func.sum(Invoice.taxable_amount).label('taxable'),
+            func.sum(Invoice.cgst_amount).label('cgst'),
+            func.sum(Invoice.sgst_amount).label('sgst'),
+            func.sum(Invoice.igst_amount).label('igst'),
+            func.sum(Invoice.cess_amount).label('cess'),
+        )
+        .where(Invoice.invoice_type == InvoiceType.SALES)
+        .where(Invoice.invoice_date >= from_date)
+        .where(Invoice.invoice_date <= to_date)
+        .where(Invoice.status != InvoiceStatus.CANCELLED)
+    )
+    sales = sales_result.one()
+
+    # Inward Supplies liable to reverse charge
+    reverse_charge_result = await db.execute(
+        select(
+            func.sum(Invoice.taxable_amount).label('taxable'),
+            func.sum(Invoice.cgst_amount).label('cgst'),
+            func.sum(Invoice.sgst_amount).label('sgst'),
+            func.sum(Invoice.igst_amount).label('igst'),
+            func.sum(Invoice.cess_amount).label('cess'),
+        )
+        .where(Invoice.invoice_type == InvoiceType.PURCHASE)
+        .where(Invoice.reverse_charge == True)
+        .where(Invoice.invoice_date >= from_date)
+        .where(Invoice.invoice_date <= to_date)
+        .where(Invoice.status != InvoiceStatus.CANCELLED)
+    )
+    reverse_charge = reverse_charge_result.one()
+
+    # Eligible ITC (Input Tax Credit) - from purchases
+    purchase_result = await db.execute(
+        select(
+            func.sum(Invoice.taxable_amount).label('taxable'),
+            func.sum(Invoice.cgst_amount).label('cgst'),
+            func.sum(Invoice.sgst_amount).label('sgst'),
+            func.sum(Invoice.igst_amount).label('igst'),
+            func.sum(Invoice.cess_amount).label('cess'),
+        )
+        .where(Invoice.invoice_type == InvoiceType.PURCHASE)
+        .where(Invoice.invoice_date >= from_date)
+        .where(Invoice.invoice_date <= to_date)
+        .where(Invoice.status != InvoiceStatus.CANCELLED)
+    )
+    purchases = purchase_result.one()
+
+    return {
+        "period": f"{from_date} to {to_date}",
+        "gstin": "",  # Should be fetched from company settings
+        "legal_name": "",  # Should be fetched from company settings
+        "section_3_1": {
+            "description": "Outward taxable supplies (other than zero rated, nil rated and exempted)",
+            "taxable_value": float(sales.taxable or 0),
+            "cgst": float(sales.cgst or 0),
+            "sgst": float(sales.sgst or 0),
+            "igst": float(sales.igst or 0),
+            "cess": float(sales.cess or 0),
+        },
+        "section_3_2": {
+            "description": "Outward taxable supplies (zero rated)",
+            "taxable_value": 0,
+            "cgst": 0,
+            "sgst": 0,
+            "igst": 0,
+            "cess": 0,
+        },
+        "section_4": {
+            "description": "Inward supplies liable to reverse charge",
+            "taxable_value": float(reverse_charge.taxable or 0),
+            "cgst": float(reverse_charge.cgst or 0),
+            "sgst": float(reverse_charge.sgst or 0),
+            "igst": float(reverse_charge.igst or 0),
+            "cess": float(reverse_charge.cess or 0),
+        },
+        "section_4_itc": {
+            "description": "Eligible ITC",
+            "import_of_goods": {"igst": 0, "cess": 0},
+            "import_of_services": {"igst": 0, "cess": 0},
+            "inputs": {
+                "cgst": float(purchases.cgst or 0),
+                "sgst": float(purchases.sgst or 0),
+                "igst": float(purchases.igst or 0),
+                "cess": float(purchases.cess or 0),
+            },
+            "capital_goods": {"cgst": 0, "sgst": 0, "igst": 0, "cess": 0},
+            "itc_reversed": {"cgst": 0, "sgst": 0, "igst": 0, "cess": 0},
+            "net_itc_available": {
+                "cgst": float(purchases.cgst or 0),
+                "sgst": float(purchases.sgst or 0),
+                "igst": float(purchases.igst or 0),
+                "cess": float(purchases.cess or 0),
+            },
+        },
+        "section_5_exempt": {
+            "description": "Values of exempt, nil-rated and non-GST supplies",
+            "inter_state": 0,
+            "intra_state": 0,
+        },
+        "section_6_net_tax": {
+            "description": "Net tax liability",
+            "cgst": float((sales.cgst or 0) - (purchases.cgst or 0)),
+            "sgst": float((sales.sgst or 0) - (purchases.sgst or 0)),
+            "igst": float((sales.igst or 0) - (purchases.igst or 0)),
+            "cess": float((sales.cess or 0) - (purchases.cess or 0)),
+        },
+    }

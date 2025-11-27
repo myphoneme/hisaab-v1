@@ -11,7 +11,7 @@ from app.models.invoice import Invoice, InvoiceItem, InvoiceType, InvoiceStatus
 from app.models.client import Client
 from app.models.vendor import Vendor
 from app.models.user import User
-from app.schemas.invoice import InvoiceCreate, InvoiceUpdate, InvoiceResponse
+from app.schemas.invoice import InvoiceCreate, InvoiceUpdate, InvoiceResponse, InvoiceItemCreate
 from app.schemas.common import PaginatedResponse, Message
 from app.core.security import get_current_user
 from app.services.number_generator import generate_invoice_number
@@ -242,6 +242,106 @@ async def create_invoice(
     invoice.amount_paid = Decimal('0')
 
     db.add(invoice)
+    await db.commit()
+    await db.refresh(invoice)
+
+    # Reload with relationships
+    result = await db.execute(
+        select(Invoice)
+        .options(
+            selectinload(Invoice.items),
+            selectinload(Invoice.client),
+            selectinload(Invoice.vendor)
+        )
+        .where(Invoice.id == invoice.id)
+    )
+    return result.scalar_one()
+
+
+@router.patch("/{invoice_id}", response_model=InvoiceResponse)
+async def update_invoice(
+    invoice_id: int,
+    invoice_data: InvoiceUpdate,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Update an invoice (only if in DRAFT status)."""
+    result = await db.execute(
+        select(Invoice)
+        .options(selectinload(Invoice.items))
+        .where(Invoice.id == invoice_id)
+    )
+    invoice = result.scalar_one_or_none()
+    if not invoice:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Invoice not found")
+
+    if invoice.status != InvoiceStatus.DRAFT:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Can only edit invoices in DRAFT status"
+        )
+
+    # Update basic fields
+    update_data = invoice_data.model_dump(exclude={'items'}, exclude_unset=True)
+    for field, value in update_data.items():
+        setattr(invoice, field, value)
+
+    # Update items if provided
+    if invoice_data.items is not None:
+        # Delete existing items
+        for item in invoice.items:
+            await db.delete(item)
+
+        # Recalculate with new items
+        subtotal = Decimal('0')
+        total_cgst = Decimal('0')
+        total_sgst = Decimal('0')
+        total_igst = Decimal('0')
+        total_cess = Decimal('0')
+
+        for item_data in invoice_data.items:
+            item_dict = item_data.model_dump()
+            amounts = calculate_invoice_item_amounts(item_dict, invoice.is_igst)
+
+            item = InvoiceItem(
+                **item_dict,
+                **amounts,
+            )
+            invoice.items.append(item)
+
+            subtotal += amounts['taxable_amount']
+            total_cgst += amounts['cgst_amount']
+            total_sgst += amounts['sgst_amount']
+            total_igst += amounts['igst_amount']
+            total_cess += amounts['cess_amount']
+
+        # Recalculate totals
+        discount_amount = subtotal * invoice.discount_percent / 100
+        taxable_amount = subtotal - discount_amount
+        total_tax = total_cgst + total_sgst + total_igst + total_cess
+        total_before_round = taxable_amount + total_tax
+
+        round_off = round(total_before_round) - total_before_round
+        total_amount = round(total_before_round)
+
+        tds_amount = taxable_amount * invoice.tds_rate / 100 if invoice.tds_applicable else Decimal('0')
+        tcs_amount = total_amount * invoice.tcs_rate / 100 if invoice.tcs_applicable else Decimal('0')
+        amount_after_tds = total_amount - tds_amount + tcs_amount
+
+        invoice.subtotal = subtotal
+        invoice.discount_amount = discount_amount
+        invoice.taxable_amount = taxable_amount
+        invoice.cgst_amount = total_cgst
+        invoice.sgst_amount = total_sgst
+        invoice.igst_amount = total_igst
+        invoice.cess_amount = total_cess
+        invoice.round_off = round_off
+        invoice.total_amount = total_amount
+        invoice.tds_amount = tds_amount
+        invoice.tcs_amount = tcs_amount
+        invoice.amount_after_tds = amount_after_tds
+        invoice.amount_due = amount_after_tds - invoice.amount_paid
+
     await db.commit()
     await db.refresh(invoice)
 

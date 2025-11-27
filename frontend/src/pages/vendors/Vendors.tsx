@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Plus, Edit, Trash2, Search } from 'lucide-react';
+import { toast } from 'sonner';
 import { vendorApi } from '../../services/api';
 import type { Vendor, VendorCreate } from '../../types';
 import { Card, CardContent, CardHeader } from '../../components/ui/Card';
@@ -17,8 +18,9 @@ export function Vendors() {
   const { data: vendors, isLoading } = useQuery<Vendor[]>({
     queryKey: ['vendors'],
     queryFn: async () => {
-      const response = await vendorApi.getAll();
-      return Array.isArray(response) ? response : [];
+      const response: any = await vendorApi.getAll();
+      // Backend returns PaginatedResponse with items array
+      return response?.items || [];
     },
   });
 
@@ -27,6 +29,25 @@ export function Vendors() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['vendors'] });
       setShowForm(false);
+      toast.success('Vendor created successfully!');
+    },
+    onError: (error: any) => {
+      console.error('Create vendor error:', error);
+      let errorMessage = 'Failed to create vendor';
+
+      if (error.response?.data?.detail) {
+        const detail = error.response.data.detail;
+        if (Array.isArray(detail)) {
+          errorMessage = detail.map((err: any) => {
+            const field = err.loc?.join('.') || 'Unknown field';
+            return `${field}: ${err.msg}`;
+          }).join('\n');
+        } else if (typeof detail === 'string') {
+          errorMessage = detail;
+        }
+      }
+
+      toast.error(errorMessage);
     },
   });
 
@@ -37,6 +58,12 @@ export function Vendors() {
       queryClient.invalidateQueries({ queryKey: ['vendors'] });
       setShowForm(false);
       setEditingVendor(null);
+      toast.success('Vendor updated successfully!');
+    },
+    onError: (error: any) => {
+      console.error('Update vendor error:', error);
+      const errorMessage = error.response?.data?.detail || 'Failed to update vendor';
+      toast.error(errorMessage);
     },
   });
 
@@ -44,6 +71,12 @@ export function Vendors() {
     mutationFn: (id: number) => vendorApi.delete(id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['vendors'] });
+      toast.success('Vendor deleted successfully!');
+    },
+    onError: (error: any) => {
+      console.error('Delete vendor error:', error);
+      const errorMessage = error.response?.data?.detail || 'Failed to delete vendor';
+      toast.error(errorMessage);
     },
   });
 
@@ -115,7 +148,7 @@ export function Vendors() {
                     <tr key={vendor.id} className="hover:bg-gray-50">
                       <td className="px-4 py-3">
                         <div className="font-medium text-gray-900">{vendor.name}</div>
-                        <div className="text-sm text-gray-500">{vendor.contact_person}</div>
+                        <div className="text-sm text-gray-500">{vendor.contact_person || '-'}</div>
                       </td>
                       <td className="px-4 py-3">
                         <div className="text-sm text-gray-900">{vendor.email}</div>

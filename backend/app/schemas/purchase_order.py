@@ -66,6 +66,11 @@ class PurchaseOrderUpdate(BaseModel):
     items: Optional[List[PurchaseOrderItemCreate]] = None
 
 
+class POStatusUpdate(BaseModel):
+    """Schema for updating purchase order status."""
+    status: POStatus
+
+
 class PurchaseOrderResponse(PurchaseOrderBase):
     id: int
     po_number: str

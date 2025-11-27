@@ -1,9 +1,10 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Plus, Edit, Trash2, Search } from 'lucide-react';
+import { toast } from 'sonner';
 import { clientApi } from '../../services/api';
 import type { Client, ClientCreate } from '../../types';
-import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/Card';
+import { Card, CardContent, CardHeader } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
 import { ClientForm } from './ClientForm';
@@ -14,12 +15,12 @@ export function Clients() {
   const [editingClient, setEditingClient] = useState<Client | null>(null);
   const queryClient = useQueryClient();
 
-  const { data: clients, isLoading, error } = useQuery<Client[]>({
+  const { data: clients, isLoading } = useQuery<Client[]>({
     queryKey: ['clients'],
     queryFn: async () => {
-      const response = await clientApi.getAll();
-      // Ensure we always return an array
-      return Array.isArray(response) ? response : [];
+      const response: any = await clientApi.getAll();
+      // Backend returns PaginatedResponse with items array
+      return response?.items || [];
     },
   });
 
@@ -28,6 +29,26 @@ export function Clients() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['clients'] });
       setShowForm(false);
+      toast.success('Client created successfully!');
+    },
+    onError: (error: any) => {
+      console.error('Create client error:', error);
+      let errorMessage = 'Failed to create client';
+
+      if (error.response?.data?.detail) {
+        const detail = error.response.data.detail;
+        if (Array.isArray(detail)) {
+          // Format validation errors
+          errorMessage = detail.map((err: any) => {
+            const field = err.loc?.join('.') || 'Unknown field';
+            return `${field}: ${err.msg}`;
+          }).join('\n');
+        } else if (typeof detail === 'string') {
+          errorMessage = detail;
+        }
+      }
+
+      toast.error(errorMessage);
     },
   });
 
@@ -38,6 +59,12 @@ export function Clients() {
       queryClient.invalidateQueries({ queryKey: ['clients'] });
       setShowForm(false);
       setEditingClient(null);
+      toast.success('Client updated successfully!');
+    },
+    onError: (error: any) => {
+      console.error('Update client error:', error);
+      const errorMessage = error.response?.data?.detail || 'Failed to update client';
+      toast.error(errorMessage);
     },
   });
 
@@ -45,6 +72,12 @@ export function Clients() {
     mutationFn: (id: number) => clientApi.delete(id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['clients'] });
+      toast.success('Client deleted successfully!');
+    },
+    onError: (error: any) => {
+      console.error('Delete client error:', error);
+      const errorMessage = error.response?.data?.detail || 'Failed to delete client';
+      toast.error(errorMessage);
     },
   });
 
@@ -135,7 +168,7 @@ export function Clients() {
                     <tr key={client.id} className="hover:bg-gray-50">
                       <td className="px-4 py-3 whitespace-nowrap">
                         <div className="font-medium text-gray-900">{client.name}</div>
-                        <div className="text-sm text-gray-500">{client.contact_person}</div>
+                        <div className="text-sm text-gray-500">{client.contact_person || '-'}</div>
                       </td>
                       <td className="px-4 py-3 whitespace-nowrap">
                         <div className="text-sm text-gray-900">{client.email}</div>
