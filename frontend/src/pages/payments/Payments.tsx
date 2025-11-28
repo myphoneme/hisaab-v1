@@ -1,16 +1,20 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { toast } from 'sonner';
 import { Plus, Eye, Trash2, Search, DollarSign } from 'lucide-react';
 import { paymentApi } from '../../services/api';
-import type { Payment } from '../../types';
+import type { Payment, PaymentCreate } from '../../types';
 import { Card, CardContent, CardHeader } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
 import { Badge } from '../../components/ui/Badge';
 import { formatCurrency } from '../../lib/utils';
+import { PaymentForm } from './PaymentForm';
 
 export function Payments() {
   const [searchTerm, setSearchTerm] = useState('');
+  const [showPaymentForm, setShowPaymentForm] = useState(false);
+  const [selectedPayment, setSelectedPayment] = useState<Payment | null>(null);
   const queryClient = useQueryClient();
 
   const { data: payments, isLoading } = useQuery<Payment[]>({
@@ -22,10 +26,32 @@ export function Payments() {
     },
   });
 
+  const createPaymentMutation = useMutation({
+    mutationFn: (data: PaymentCreate) =>
+      selectedPayment
+        ? paymentApi.update(selectedPayment.id, data)
+        : paymentApi.create(data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['payments'] });
+      toast.success(selectedPayment ? 'Payment updated successfully!' : 'Payment recorded successfully!');
+      setShowPaymentForm(false);
+      setSelectedPayment(null);
+    },
+    onError: (error: any) => {
+      console.error('Payment mutation error:', error);
+      const errorMessage = error.response?.data?.detail || 'Failed to record payment';
+      toast.error(errorMessage);
+    },
+  });
+
   const deleteMutation = useMutation({
     mutationFn: (id: number) => paymentApi.delete(id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['payments'] });
+      toast.success('Payment deleted successfully!');
+    },
+    onError: (error: any) => {
+      toast.error('Failed to delete payment');
     },
   });
 
@@ -57,7 +83,12 @@ export function Payments() {
           <h1 className="text-2xl font-bold text-gray-900">Payments</h1>
           <p className="text-gray-500 mt-1">Track receipts and payments</p>
         </div>
-        <Button>
+        <Button
+          onClick={() => {
+            setSelectedPayment(null);
+            setShowPaymentForm(true);
+          }}
+        >
           <Plus className="h-4 w-4 mr-2" />
           Record Payment
         </Button>
@@ -121,7 +152,7 @@ export function Payments() {
                         {payment.payment_mode.replace('_', ' ')}
                       </td>
                       <td className="px-4 py-3 whitespace-nowrap text-right text-sm font-medium text-gray-900">
-                        {formatCurrency((payment as any).gross_amount || 0)}
+                        {formatCurrency(payment.gross_amount || 0)}
                       </td>
                       <td className="px-4 py-3 whitespace-nowrap text-right text-sm text-gray-900">
                         {formatCurrency(payment.net_amount || 0)}
@@ -150,6 +181,19 @@ export function Payments() {
           )}
         </CardContent>
       </Card>
+
+      {/* Payment Form Modal */}
+      {showPaymentForm && (
+        <PaymentForm
+          payment={selectedPayment}
+          onSubmit={(data) => createPaymentMutation.mutate(data)}
+          onClose={() => {
+            setShowPaymentForm(false);
+            setSelectedPayment(null);
+          }}
+          isLoading={createPaymentMutation.isPending}
+        />
+      )}
     </div>
   );
 }

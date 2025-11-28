@@ -222,7 +222,7 @@ export interface Payment extends BaseEntity {
   vendor?: Vendor;
   invoice_id: number | null;
   invoice?: Invoice;
-  amount: number;
+  gross_amount: number;
   tds_amount: number;
   tcs_amount: number;
   net_amount: number;
@@ -231,6 +231,23 @@ export interface Payment extends BaseEntity {
   bank_name: string | null;
   notes: string | null;
   status: 'PENDING' | 'COMPLETED' | 'CANCELLED';
+}
+
+export interface PaymentCreate {
+  payment_date: string;
+  payment_type: 'RECEIPT' | 'PAYMENT';
+  client_id?: number;
+  vendor_id?: number;
+  invoice_id?: number;
+  gross_amount: number;
+  tds_amount?: number;
+  tcs_amount?: number;
+  payment_mode: 'CASH' | 'BANK_TRANSFER' | 'CHEQUE' | 'UPI' | 'CARD';
+  reference_number?: string;
+  bank_name?: string;
+  bank_account?: string;
+  cheque_date?: string;
+  notes?: string;
 }
 
 // Ledger Types

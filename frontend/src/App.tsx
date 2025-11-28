@@ -22,6 +22,7 @@ import { Clients } from './pages/clients/Clients';
 import { Vendors } from './pages/vendors/Vendors';
 import { Invoices } from './pages/invoices/Invoices';
 import { InvoiceForm } from './pages/invoices/InvoiceForm';
+import { InvoiceView } from './pages/invoices/InvoiceView';
 import { Payments } from './pages/payments/Payments';
 import { PurchaseOrders } from './pages/purchase-orders/PurchaseOrders';
 import { Ledger } from './pages/ledger/Ledger';
@@ -48,6 +49,7 @@ function App() {
               <Route path="invoices" element={<Invoices />} />
               <Route path="invoices/new" element={<InvoiceForm />} />
               <Route path="invoices/:id/edit" element={<InvoiceForm />} />
+              <Route path="invoices/:id" element={<InvoiceView />} />
               <Route path="payments" element={<Payments />} />
               <Route path="ledger" element={<Ledger />} />
               <Route path="reports" element={<Reports />} />

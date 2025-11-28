@@ -207,7 +207,7 @@ async def update_po_status(
     """Update purchase order status."""
     result = await db.execute(
         select(PurchaseOrder)
-        .options(selectinload(PurchaseOrder.items))
+        .options(selectinload(PurchaseOrder.items), selectinload(PurchaseOrder.client))
         .where(PurchaseOrder.id == po_id)
     )
     po = result.scalar_one_or_none()

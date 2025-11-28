@@ -1,15 +1,20 @@
 import { useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { toast } from 'sonner';
 import { Plus, BookOpen } from 'lucide-react';
 import { Card, CardContent, CardHeader } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
 import { ledgerApi } from '../../services/api';
 import { formatCurrency } from '../../lib/utils';
-import type { ChartOfAccount, TrialBalance } from '../../types';
+import type { ChartOfAccount, TrialBalance, ChartOfAccountCreate } from '../../types';
+import { AccountForm } from './AccountForm';
 
 export function Ledger() {
+  const queryClient = useQueryClient();
   const [activeTab, setActiveTab] = useState<'accounts' | 'trial-balance'>('accounts');
   const [asOnDate, setAsOnDate] = useState(new Date().toISOString().split('T')[0]);
+  const [showAccountForm, setShowAccountForm] = useState(false);
+  const [selectedAccount, setSelectedAccount] = useState<ChartOfAccount | null>(null);
 
   const { data: accountsData, isLoading: accountsLoading } = useQuery({
     queryKey: ['chart-of-accounts'],
@@ -28,6 +33,25 @@ export function Ledger() {
 
   const accounts = accountsData as ChartOfAccount[] | undefined;
 
+  // Create/Update mutation
+  const createAccountMutation = useMutation({
+    mutationFn: (data: ChartOfAccountCreate) =>
+      selectedAccount
+        ? ledgerApi.updateAccount(selectedAccount.id, data)
+        : ledgerApi.createAccount(data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['chart-of-accounts'] });
+      toast.success(selectedAccount ? 'Account updated successfully!' : 'Account created successfully!');
+      setShowAccountForm(false);
+      setSelectedAccount(null);
+    },
+    onError: (error: any) => {
+      console.error('Account mutation error:', error);
+      const errorMessage = error.response?.data?.detail || 'Failed to save account';
+      toast.error(errorMessage);
+    },
+  });
+
   // Group accounts by type
   const groupedAccounts = accounts?.reduce((acc, account) => {
     if (!acc[account.account_type]) {
@@ -44,7 +68,13 @@ export function Ledger() {
           <h1 className="text-2xl font-bold text-gray-900">Ledger & Accounts</h1>
           <p className="text-gray-500 mt-1">Chart of accounts and trial balance</p>
         </div>
-        <Button variant="outline">
+        <Button
+          variant="outline"
+          onClick={() => {
+            setSelectedAccount(null);
+            setShowAccountForm(true);
+          }}
+        >
           <Plus className="h-4 w-4 mr-2" />
           New Account
         </Button>
@@ -185,6 +215,19 @@ export function Ledger() {
             </CardContent>
           </Card>
         </div>
+      )}
+
+      {/* Account Form Modal */}
+      {showAccountForm && (
+        <AccountForm
+          account={selectedAccount}
+          onSubmit={(data) => createAccountMutation.mutate(data)}
+          onClose={() => {
+            setShowAccountForm(false);
+            setSelectedAccount(null);
+          }}
+          isLoading={createAccountMutation.isPending}
+        />
       )}
     </div>
   );
