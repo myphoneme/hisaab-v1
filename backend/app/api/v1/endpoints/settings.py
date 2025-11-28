@@ -42,23 +42,35 @@ async def create_company_settings(
     current_user: User = Depends(get_current_user),
 ):
     """Create company settings. Only one company settings record should exist."""
-    # Check if settings already exist
-    result = await db.execute(
-        select(CompanySettings).where(CompanySettings.is_active == True)
-    )
-    existing = result.scalar_one_or_none()
-
-    if existing:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Company settings already exist. Use PATCH to update."
+    try:
+        # Check if settings already exist
+        result = await db.execute(
+            select(CompanySettings).where(CompanySettings.is_active == True)
         )
+        existing = result.scalar_one_or_none()
 
-    settings = CompanySettings(**settings_data.model_dump())
-    db.add(settings)
-    await db.commit()
-    await db.refresh(settings)
-    return settings
+        if existing:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Company settings already exist. Use PATCH to update."
+            )
+
+        settings = CompanySettings(**settings_data.model_dump())
+        db.add(settings)
+        await db.commit()
+        await db.refresh(settings)
+        return settings
+    except HTTPException:
+        raise
+    except Exception as e:
+        import traceback
+        print(f"Error creating company settings: {str(e)}")
+        print(traceback.format_exc())
+        await db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to create settings: {str(e)}"
+        )
 
 
 @router.patch("/{settings_id}", response_model=CompanySettingsResponse)
@@ -95,20 +107,32 @@ async def update_active_company_settings(
     current_user: User = Depends(get_current_user),
 ):
     """Update the active company settings without requiring ID."""
-    result = await db.execute(
-        select(CompanySettings).where(CompanySettings.is_active == True)
-    )
-    settings = result.scalar_one_or_none()
-
-    if not settings:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Company settings not found. Please create settings first."
+    try:
+        result = await db.execute(
+            select(CompanySettings).where(CompanySettings.is_active == True)
         )
+        settings = result.scalar_one_or_none()
 
-    for field, value in settings_data.model_dump(exclude_unset=True).items():
-        setattr(settings, field, value)
+        if not settings:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Company settings not found. Please create settings first."
+            )
 
-    await db.commit()
-    await db.refresh(settings)
-    return settings
+        for field, value in settings_data.model_dump(exclude_unset=True).items():
+            setattr(settings, field, value)
+
+        await db.commit()
+        await db.refresh(settings)
+        return settings
+    except HTTPException:
+        raise
+    except Exception as e:
+        import traceback
+        print(f"Error updating company settings: {str(e)}")
+        print(traceback.format_exc())
+        await db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to update settings: {str(e)}"
+        )

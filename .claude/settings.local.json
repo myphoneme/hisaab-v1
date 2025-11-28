@@ -5,7 +5,9 @@
       "Bash(tasklist:*)",
       "Bash(findstr:*)",
       "Bash(find:*)",
-      "Bash(dir:*)"
+      "Bash(dir:*)",
+      "Bash(python -m pip show:*)",
+      "Bash(./python.exe -m alembic:*)"
     ],
     "deny": [],
     "ask": []

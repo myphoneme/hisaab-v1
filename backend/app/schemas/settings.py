@@ -1,5 +1,6 @@
-from pydantic import BaseModel, EmailStr, Field
+from pydantic import BaseModel, EmailStr, Field, field_serializer
 from typing import Optional
+from datetime import datetime
 
 
 class CompanySettingsBase(BaseModel):
@@ -93,8 +94,12 @@ class CompanySettingsUpdate(BaseModel):
 class CompanySettingsResponse(CompanySettingsBase):
     id: int
     is_active: bool
-    created_at: str
-    updated_at: str
+    created_at: datetime
+    updated_at: datetime
+
+    @field_serializer('created_at', 'updated_at')
+    def serialize_datetime(self, dt: datetime, _info) -> str:
+        return dt.isoformat() if dt else None
 
     class Config:
         from_attributes = True

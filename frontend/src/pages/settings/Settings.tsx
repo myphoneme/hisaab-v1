@@ -8,11 +8,36 @@ import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
 import type { CompanySettings, CompanySettingsUpdate } from '../../types';
 
+// Helper function to format error messages from API responses
+function formatErrorMessage(error: any): string {
+  if (error.response?.data?.detail) {
+    const detail = error.response.data.detail;
+
+    // If detail is an array (FastAPI validation errors)
+    if (Array.isArray(detail)) {
+      return detail.map((err: any) => {
+        const field = err.loc ? err.loc.join(' > ') : 'field';
+        return `${field}: ${err.msg}`;
+      }).join(', ');
+    }
+
+    // If detail is a string
+    if (typeof detail === 'string') {
+      return detail;
+    }
+
+    // If detail is an object, try to stringify it
+    return JSON.stringify(detail);
+  }
+
+  return error.message || 'An error occurred';
+}
+
 export function Settings() {
   const queryClient = useQueryClient();
   const [activeTab, setActiveTab] = useState<'company' | 'tax' | 'bank' | 'preferences'>('company');
 
-  const { data: settings, isLoading, error } = useQuery<CompanySettings>({
+  const { data: settings, isLoading, error, isError } = useQuery<CompanySettings>({
     queryKey: ['settings'],
     queryFn: settingsApi.get,
     retry: false,
@@ -28,7 +53,7 @@ export function Settings() {
     },
     onError: (error: any) => {
       console.error('Update settings error:', error);
-      const errorMessage = error.response?.data?.detail || 'Failed to update settings';
+      const errorMessage = formatErrorMessage(error);
       toast.error(errorMessage);
     },
   });
@@ -41,7 +66,7 @@ export function Settings() {
     },
     onError: (error: any) => {
       console.error('Create settings error:', error);
-      const errorMessage = error.response?.data?.detail || 'Failed to create settings';
+      const errorMessage = formatErrorMessage(error);
       toast.error(errorMessage);
     },
   });
@@ -51,7 +76,41 @@ export function Settings() {
     if (settings) {
       updateMutation.mutate(formData);
     } else {
-      createMutation.mutate(formData);
+      // When creating settings, ensure all required fields are present
+      const createData = {
+        company_name: formData.company_name || '',
+        pan: formData.pan || '',
+        address: formData.address || '',
+        city: formData.city || '',
+        state: formData.state || '',
+        state_code: formData.state_code || '',
+        pincode: formData.pincode || '',
+        email: formData.email || '',
+        phone: formData.phone || '',
+        // Optional fields
+        company_logo: formData.company_logo,
+        gstin: formData.gstin,
+        tan: formData.tan,
+        cin: formData.cin,
+        country: formData.country || 'India',
+        website: formData.website,
+        bank_name: formData.bank_name,
+        bank_account_number: formData.bank_account_number,
+        bank_ifsc: formData.bank_ifsc,
+        bank_branch: formData.bank_branch,
+        bank_account_type: formData.bank_account_type,
+        financial_year_start_month: formData.financial_year_start_month || 4,
+        default_currency: formData.default_currency || 'INR',
+        default_gst_rate: formData.default_gst_rate || 18,
+        enable_tds: formData.enable_tds !== undefined ? formData.enable_tds : true,
+        enable_tcs: formData.enable_tcs || false,
+        invoice_prefix: formData.invoice_prefix || 'INV',
+        invoice_terms: formData.invoice_terms,
+        invoice_notes: formData.invoice_notes,
+        enable_multi_currency: formData.enable_multi_currency || false,
+        enable_inventory: formData.enable_inventory || false,
+      };
+      createMutation.mutate(createData);
     }
   };
 
@@ -67,6 +126,21 @@ export function Settings() {
     );
   }
 
+  // Check if error is 404 (settings not found) - this is okay, user can create new settings
+  const is404Error = (error as any)?.response?.status === 404;
+
+  // Show error only if it's not a 404 (which means settings don't exist yet)
+  if (isError && !is404Error) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="text-center">
+          <p className="text-red-500 mb-2">Error loading settings</p>
+          <p className="text-gray-500 text-sm">{formatErrorMessage(error)}</p>
+        </div>
+      </div>
+    );
+  }
+
   const currentData = { ...settings, ...formData };
 
   return (
@@ -74,7 +148,11 @@ export function Settings() {
       <div className="flex justify-between items-center">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Company Settings</h1>
-          <p className="text-gray-500 mt-1">Manage your company profile and preferences</p>
+          <p className="text-gray-500 mt-1">
+            {!settings && is404Error
+              ? 'Create your company profile and preferences'
+              : 'Manage your company profile and preferences'}
+          </p>
         </div>
       </div>
 
@@ -370,7 +448,7 @@ export function Settings() {
             <div className="mt-6 flex justify-end">
               <Button type="submit" disabled={updateMutation.isPending || createMutation.isPending}>
                 <Save className="h-4 w-4 mr-2" />
-                Save Settings
+                {settings ? 'Update Settings' : 'Create Settings'}
               </Button>
             </div>
           </CardContent>
