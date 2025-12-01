@@ -40,6 +40,10 @@ class Payment(BaseModel):
     client_id = Column(Integer, ForeignKey("clients.id"), nullable=True)
     vendor_id = Column(Integer, ForeignKey("vendors.id"), nullable=True)
 
+    # Branch & Bank Account
+    branch_id = Column(Integer, ForeignKey("branches.id"), nullable=False, index=True)
+    bank_account_id = Column(Integer, ForeignKey("bank_accounts.id"), nullable=False, index=True)
+
     # Reference to Invoice
     invoice_id = Column(Integer, ForeignKey("invoices.id"), nullable=True)
 
@@ -69,4 +73,6 @@ class Payment(BaseModel):
     # Relationships
     client = relationship("Client", back_populates="payments")
     vendor = relationship("Vendor", back_populates="payments")
+    branch = relationship("Branch", back_populates="payments")
+    bank_account = relationship("BankAccount", back_populates="payments")
     invoice = relationship("Invoice", back_populates="payments")

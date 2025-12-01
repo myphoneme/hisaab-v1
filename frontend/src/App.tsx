@@ -20,6 +20,8 @@ const queryClient = new QueryClient({
 
 import { Clients } from './pages/clients/Clients';
 import { Vendors } from './pages/vendors/Vendors';
+import { Branches } from './pages/branches/Branches';
+import { BankAccounts } from './pages/bank-accounts/BankAccounts';
 import { Invoices } from './pages/invoices/Invoices';
 import { InvoiceForm } from './pages/invoices/InvoiceForm';
 import { InvoiceView } from './pages/invoices/InvoiceView';
@@ -45,6 +47,8 @@ function App() {
               <Route index element={<Dashboard />} />
               <Route path="clients" element={<Clients />} />
               <Route path="vendors" element={<Vendors />} />
+              <Route path="branches" element={<Branches />} />
+              <Route path="bank-accounts" element={<BankAccounts />} />
               <Route path="purchase-orders" element={<PurchaseOrders />} />
               <Route path="invoices" element={<Invoices />} />
               <Route path="invoices/new" element={<InvoiceForm />} />

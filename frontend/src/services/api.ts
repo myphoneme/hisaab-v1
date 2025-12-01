@@ -83,6 +83,27 @@ export const vendorApi = {
   delete: (id: number) => api.delete(`/vendors/${id}`),
 };
 
+// Branch API
+export const branchApi = {
+  getAll: (params?: Record<string, unknown>) => api.get('/branches', params),
+  getActive: () => api.get('/branches/active'),
+  getById: (id: number) => api.get(`/branches/${id}`),
+  create: (data: unknown) => api.post('/branches', data),
+  update: (id: number, data: unknown) => api.patch(`/branches/${id}`, data),
+  delete: (id: number) => api.delete(`/branches/${id}`),
+  getBankAccounts: (id: number) => api.get(`/branches/${id}/bank-accounts`),
+};
+
+// Bank Account API
+export const bankAccountApi = {
+  getAll: (params?: Record<string, unknown>) => api.get('/bank-accounts', params),
+  getById: (id: number) => api.get(`/bank-accounts/${id}`),
+  create: (data: unknown) => api.post('/bank-accounts', data),
+  update: (id: number, data: unknown) => api.patch(`/bank-accounts/${id}`, data),
+  delete: (id: number) => api.delete(`/bank-accounts/${id}`),
+  setDefault: (id: number) => api.patch(`/bank-accounts/${id}/set-default`),
+};
+
 // Purchase Order API
 export const purchaseOrderApi = {
   getAll: (params?: Record<string, unknown>) => api.get('/purchase-orders', params),

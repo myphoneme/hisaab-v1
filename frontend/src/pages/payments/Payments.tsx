@@ -8,19 +8,23 @@ import { Card, CardContent, CardHeader } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
 import { Badge } from '../../components/ui/Badge';
+import { BranchSelector } from '../../components/ui/BranchSelector';
 import { formatCurrency } from '../../lib/utils';
 import { PaymentForm } from './PaymentForm';
 
 export function Payments() {
   const [searchTerm, setSearchTerm] = useState('');
+  const [branchId, setBranchId] = useState<number | string>('');
   const [showPaymentForm, setShowPaymentForm] = useState(false);
   const [selectedPayment, setSelectedPayment] = useState<Payment | null>(null);
   const queryClient = useQueryClient();
 
   const { data: payments, isLoading } = useQuery<Payment[]>({
-    queryKey: ['payments'],
+    queryKey: ['payments', branchId],
     queryFn: async () => {
-      const response = await paymentApi.getAll();
+      const params: any = {};
+      if (branchId) params.branch_id = branchId;
+      const response = await paymentApi.getAll(params);
       // Handle paginated response
       return response?.items || [];
     },
@@ -96,15 +100,25 @@ export function Payments() {
 
       <Card>
         <CardHeader>
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-            <Input
-              type="text"
-              placeholder="Search payments..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="pl-10"
-            />
+          <div className="flex gap-4">
+            <div className="w-64">
+              <BranchSelector
+                value={branchId}
+                onChange={setBranchId}
+                label=""
+                required={false}
+              />
+            </div>
+            <div className="relative flex-1">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+              <Input
+                type="text"
+                placeholder="Search payments..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="pl-10"
+              />
+            </div>
           </div>
         </CardHeader>
         <CardContent>

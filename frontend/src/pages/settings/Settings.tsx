@@ -3,7 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Save } from 'lucide-react';
 import { toast } from 'sonner';
 import { settingsApi } from '../../services/api';
-import { Card, CardContent, CardHeader } from '../../components/ui/Card';
+import { Card, CardContent } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
 import type { CompanySettings, CompanySettingsUpdate } from '../../types';
@@ -39,7 +39,7 @@ export function Settings() {
 
   const { data: settings, isLoading, error, isError } = useQuery<CompanySettings>({
     queryKey: ['settings'],
-    queryFn: settingsApi.get,
+    queryFn: () => settingsApi.get() as Promise<CompanySettings>,
     retry: false,
   });
 
@@ -74,7 +74,11 @@ export function Settings() {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (settings) {
-      updateMutation.mutate(formData);
+      // Filter out null values to match CompanySettingsUpdate type
+      const updateData: CompanySettingsUpdate = Object.fromEntries(
+        Object.entries(formData).filter(([_, value]) => value !== null)
+      ) as CompanySettingsUpdate;
+      updateMutation.mutate(updateData);
     } else {
       // When creating settings, ensure all required fields are present
       const createData = {

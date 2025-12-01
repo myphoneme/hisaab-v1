@@ -4,25 +4,35 @@ import { Download, FileText } from 'lucide-react';
 import { Card, CardContent, CardHeader } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
+import { BranchSelector } from '../../components/ui/BranchSelector';
 import { reportsApi } from '../../services/api';
 import { formatCurrency } from '../../lib/utils';
 
 export function GSTReports() {
   const [activeTab, setActiveTab] = useState<'gstr1' | 'gstr3b'>('gstr1');
+  const [branchId, setBranchId] = useState<number | string>('');
   const [dateRange, setDateRange] = useState({
     from: new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split('T')[0],
     to: new Date().toISOString().split('T')[0],
   });
 
   const { data: gstr1, isLoading: gstr1Loading } = useQuery({
-    queryKey: ['gstr-1', dateRange],
-    queryFn: () => reportsApi.getGSTR1({ from_date: dateRange.from, to_date: dateRange.to }),
+    queryKey: ['gstr-1', dateRange, branchId],
+    queryFn: () => {
+      const params: any = { from_date: dateRange.from, to_date: dateRange.to };
+      if (branchId) params.branch_id = branchId;
+      return reportsApi.getGSTR1(params);
+    },
     enabled: activeTab === 'gstr1',
   });
 
   const { data: gstr3b, isLoading: gstr3bLoading } = useQuery({
-    queryKey: ['gstr-3b', dateRange],
-    queryFn: () => reportsApi.getGSTR3B({ from_date: dateRange.from, to_date: dateRange.to }),
+    queryKey: ['gstr-3b', dateRange, branchId],
+    queryFn: () => {
+      const params: any = { from_date: dateRange.from, to_date: dateRange.to };
+      if (branchId) params.branch_id = branchId;
+      return reportsApi.getGSTR3B(params);
+    },
     enabled: activeTab === 'gstr3b',
   });
 
@@ -39,10 +49,18 @@ export function GSTReports() {
         </Button>
       </div>
 
-      {/* Date Range */}
+      {/* Filters */}
       <Card>
         <CardContent className="p-4">
           <div className="flex gap-4 items-center">
+            <div className="w-64">
+              <BranchSelector
+                value={branchId}
+                onChange={setBranchId}
+                label="Branch"
+                required={false}
+              />
+            </div>
             <span className="text-sm font-medium">Period:</span>
             <Input
               type="date"

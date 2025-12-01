@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import {
   TrendingUp,
@@ -9,6 +10,8 @@ import {
   ArrowDownRight,
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/Card';
+import { BranchSelector } from '../../components/ui/BranchSelector';
+import { FinancialYearSelector } from '../../components/ui/FinancialYearSelector';
 import { formatCurrency } from '../../lib/utils';
 import { reportsApi } from '../../services/api';
 import type { DashboardStats } from '../../types';
@@ -66,9 +69,21 @@ function StatCard({
 }
 
 export function Dashboard() {
+  const [branchId, setBranchId] = useState<number | string>('');
+  const [financialYear, setFinancialYear] = useState<string>('');
+
   const { data: stats } = useQuery<DashboardStats>({
-    queryKey: ['dashboard-stats'],
-    queryFn: () => reportsApi.getDashboard() as Promise<DashboardStats>,
+    queryKey: ['dashboard-stats', branchId, financialYear],
+    queryFn: () => {
+      const params: any = {};
+      if (branchId) params.branch_id = branchId;
+      if (financialYear) {
+        const [startYear] = financialYear.split('-');
+        params.from_date = `${startYear}-04-01`;
+        params.to_date = `${parseInt(startYear) + 1}-03-31`;
+      }
+      return reportsApi.getDashboard(params) as Promise<DashboardStats>;
+    },
   });
 
   // Default stats for demo
@@ -91,6 +106,29 @@ export function Dashboard() {
         <h1 className="text-2xl font-bold text-gray-900">Dashboard</h1>
         <p className="text-gray-500 mt-1">Welcome back! Here's an overview of your business.</p>
       </div>
+
+      <Card>
+        <CardContent className="p-4">
+          <div className="flex gap-4">
+            <div className="w-64">
+              <BranchSelector
+                value={branchId}
+                onChange={setBranchId}
+                label="Filter by Branch"
+                required={false}
+              />
+            </div>
+            <div className="w-64">
+              <FinancialYearSelector
+                value={financialYear}
+                onChange={setFinancialYear}
+                label="Financial Year"
+                required={false}
+              />
+            </div>
+          </div>
+        </CardContent>
+      </Card>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         <StatCard

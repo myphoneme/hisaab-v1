@@ -5,6 +5,7 @@ import type { PurchaseOrder, PurchaseOrderCreate } from '../../types';
 import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
 import { Select } from '../../components/ui/Select';
+import { BranchSelector } from '../../components/ui/BranchSelector';
 import { clientApi } from '../../services/api';
 
 interface PurchaseOrderFormProps {
@@ -17,9 +18,10 @@ interface PurchaseOrderFormProps {
 const UNITS = ['NOS', 'KG', 'METER', 'LITER', 'BOX', 'PIECE', 'SET'];
 
 export function PurchaseOrderForm({ purchaseOrder, onSubmit, onClose, isLoading }: PurchaseOrderFormProps) {
-  const { register, handleSubmit, formState: { errors }, control, watch } = useForm<PurchaseOrderCreate>({
+  const { register, handleSubmit, formState: { errors }, control, watch, setValue } = useForm<PurchaseOrderCreate>({
     defaultValues: purchaseOrder ? {
       po_date: purchaseOrder.po_date,
+      branch_id: purchaseOrder.branch_id,
       client_id: purchaseOrder.client_id,
       reference_number: purchaseOrder.reference_number || '',
       subject: purchaseOrder.subject || '',
@@ -139,6 +141,15 @@ export function PurchaseOrderForm({ purchaseOrder, onSubmit, onClose, isLoading 
                 {...register('po_date', { required: 'PO date is required' })}
               />
               {errors.po_date && <p className="text-red-500 text-sm mt-1">{errors.po_date.message}</p>}
+            </div>
+
+            <div>
+              <BranchSelector
+                value={watch('branch_id') || ''}
+                onChange={(branchId) => setValue('branch_id', branchId, { shouldValidate: true })}
+                required
+                error={errors.branch_id?.message}
+              />
             </div>
 
             <div>

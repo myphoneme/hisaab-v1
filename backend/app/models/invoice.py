@@ -33,6 +33,9 @@ class Invoice(BaseModel):
     client_id = Column(Integer, ForeignKey("clients.id"), nullable=True)
     vendor_id = Column(Integer, ForeignKey("vendors.id"), nullable=True)
 
+    # Branch
+    branch_id = Column(Integer, ForeignKey("branches.id"), nullable=False, index=True)
+
     # Reference to PO
     po_id = Column(Integer, ForeignKey("purchase_orders.id"), nullable=True)
 
@@ -89,6 +92,7 @@ class Invoice(BaseModel):
     # Relationships
     client = relationship("Client", back_populates="invoices")
     vendor = relationship("Vendor", back_populates="invoices")
+    branch = relationship("Branch", back_populates="invoices")
     purchase_order = relationship("PurchaseOrder", back_populates="invoices")
     items = relationship("InvoiceItem", back_populates="invoice", cascade="all, delete-orphan")
     payments = relationship("Payment", back_populates="invoice")

@@ -22,6 +22,8 @@ router = APIRouter()
 async def get_payments(
     page: int = Query(1, ge=1),
     page_size: int = Query(10, ge=1, le=100),
+    branch_id: Optional[int] = None,
+    bank_account_id: Optional[int] = None,
     payment_type: Optional[PaymentType] = None,
     client_id: Optional[int] = None,
     vendor_id: Optional[int] = None,
@@ -30,12 +32,18 @@ async def get_payments(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """Get all payments with pagination."""
+    """Get all payments with pagination and filtering by branch, bank account, dates, etc."""
     query = select(Payment).options(
         selectinload(Payment.client),
-        selectinload(Payment.vendor)
+        selectinload(Payment.vendor),
+        selectinload(Payment.branch),
+        selectinload(Payment.bank_account)
     )
 
+    if branch_id:
+        query = query.where(Payment.branch_id == branch_id)
+    if bank_account_id:
+        query = query.where(Payment.bank_account_id == bank_account_id)
     if payment_type:
         query = query.where(Payment.payment_type == payment_type)
     if client_id:

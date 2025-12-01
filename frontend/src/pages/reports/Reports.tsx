@@ -4,6 +4,8 @@ import { TrendingUp, TrendingDown, Users, FileText, DollarSign, AlertCircle } fr
 import { Card, CardContent, CardHeader } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
+import { BranchSelector } from '../../components/ui/BranchSelector';
+import { FinancialYearSelector } from '../../components/ui/FinancialYearSelector';
 import { reportsApi } from '../../services/api';
 import { formatCurrency } from '../../lib/utils';
 import { useNavigate } from 'react-router-dom';
@@ -21,29 +23,52 @@ interface DashboardStats {
 
 export function Reports() {
   const navigate = useNavigate();
+  const [branchId, setBranchId] = useState<number | string>('');
+  const [financialYear, setFinancialYear] = useState<string>('');
   const [dateRange, setDateRange] = useState({
     from: new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split('T')[0],
     to: new Date().toISOString().split('T')[0],
   });
 
   const { data: stats, isLoading } = useQuery<DashboardStats>({
-    queryKey: ['dashboard-stats'],
-    queryFn: () => reportsApi.getDashboard(),
+    queryKey: ['dashboard-stats', branchId, financialYear],
+    queryFn: () => {
+      const params: any = {};
+      if (branchId) params.branch_id = branchId;
+      if (financialYear) {
+        const [startYear] = financialYear.split('-');
+        params.from_date = `${startYear}-04-01`;
+        params.to_date = `${parseInt(startYear) + 1}-03-31`;
+      }
+      return reportsApi.getDashboard(params);
+    },
   });
 
   const { data: gstSummary } = useQuery({
-    queryKey: ['gst-summary', dateRange],
-    queryFn: () => reportsApi.getGSTSummary({ from_date: dateRange.from, to_date: dateRange.to }),
+    queryKey: ['gst-summary', dateRange, branchId],
+    queryFn: () => {
+      const params: any = { from_date: dateRange.from, to_date: dateRange.to };
+      if (branchId) params.branch_id = branchId;
+      return reportsApi.getGSTSummary(params);
+    },
   });
 
   const { data: tdsSummary } = useQuery({
-    queryKey: ['tds-summary', dateRange],
-    queryFn: () => reportsApi.getTDSSummary({ from_date: dateRange.from, to_date: dateRange.to }),
+    queryKey: ['tds-summary', dateRange, branchId],
+    queryFn: () => {
+      const params: any = { from_date: dateRange.from, to_date: dateRange.to };
+      if (branchId) params.branch_id = branchId;
+      return reportsApi.getTDSSummary(params);
+    },
   });
 
   const { data: agingReport } = useQuery({
-    queryKey: ['aging-report'],
-    queryFn: () => reportsApi.getAgingReport({ report_type: 'receivables' }),
+    queryKey: ['aging-report', branchId],
+    queryFn: () => {
+      const params: any = { report_type: 'receivables' };
+      if (branchId) params.branch_id = branchId;
+      return reportsApi.getAgingReport(params);
+    },
   });
 
   if (isLoading) {
@@ -67,6 +92,30 @@ export function Reports() {
           </Button>
         </div>
       </div>
+
+      {/* Filters */}
+      <Card>
+        <CardContent className="p-4">
+          <div className="flex gap-4">
+            <div className="w-64">
+              <BranchSelector
+                value={branchId}
+                onChange={setBranchId}
+                label="Filter by Branch"
+                required={false}
+              />
+            </div>
+            <div className="w-64">
+              <FinancialYearSelector
+                value={financialYear}
+                onChange={setFinancialYear}
+                label="Financial Year"
+                required={false}
+              />
+            </div>
+          </div>
+        </CardContent>
+      </Card>
 
       {/* Key Metrics */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">

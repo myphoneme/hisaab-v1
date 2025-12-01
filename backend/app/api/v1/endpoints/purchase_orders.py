@@ -59,6 +59,7 @@ def calculate_item_amounts(item_data: dict, is_igst: bool) -> dict:
 async def get_purchase_orders(
     page: int = Query(1, ge=1),
     page_size: int = Query(10, ge=1, le=100),
+    branch_id: Optional[int] = None,
     client_id: Optional[int] = None,
     status_filter: Optional[POStatus] = None,
     from_date: Optional[date] = None,
@@ -66,9 +67,15 @@ async def get_purchase_orders(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """Get all purchase orders with pagination."""
-    query = select(PurchaseOrder).options(selectinload(PurchaseOrder.items), selectinload(PurchaseOrder.client))
+    """Get all purchase orders with pagination and filtering by branch, dates, etc."""
+    query = select(PurchaseOrder).options(
+        selectinload(PurchaseOrder.items),
+        selectinload(PurchaseOrder.client),
+        selectinload(PurchaseOrder.branch)
+    )
 
+    if branch_id:
+        query = query.where(PurchaseOrder.branch_id == branch_id)
     if client_id:
         query = query.where(PurchaseOrder.client_id == client_id)
     if status_filter:

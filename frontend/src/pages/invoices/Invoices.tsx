@@ -8,17 +8,21 @@ import { Card, CardContent, CardHeader } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
 import { Badge } from '../../components/ui/Badge';
+import { BranchSelector } from '../../components/ui/BranchSelector';
 import { formatCurrency } from '../../lib/utils';
 
 export function Invoices() {
   const navigate = useNavigate();
   const [searchTerm, setSearchTerm] = useState('');
+  const [branchId, setBranchId] = useState<number | string>('');
   const queryClient = useQueryClient();
 
   const { data: invoices, isLoading } = useQuery<Invoice[]>({
-    queryKey: ['invoices'],
+    queryKey: ['invoices', branchId],
     queryFn: async () => {
-      const response = await invoiceApi.getAll();
+      const params: any = {};
+      if (branchId) params.branch_id = branchId;
+      const response = await invoiceApi.getAll(params);
       // Handle paginated response
       return response?.items || [];
     },
@@ -70,15 +74,25 @@ export function Invoices() {
 
       <Card>
         <CardHeader>
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-            <Input
-              type="text"
-              placeholder="Search invoices..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="pl-10"
-            />
+          <div className="flex gap-4">
+            <div className="w-64">
+              <BranchSelector
+                value={branchId}
+                onChange={setBranchId}
+                label=""
+                required={false}
+              />
+            </div>
+            <div className="relative flex-1">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+              <Input
+                type="text"
+                placeholder="Search invoices..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="pl-10"
+              />
+            </div>
           </div>
         </CardHeader>
         <CardContent>

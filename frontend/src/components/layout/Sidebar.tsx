@@ -10,6 +10,8 @@ import {
   Settings,
   Receipt,
   BookOpen,
+  Landmark,
+  MapPin,
 } from 'lucide-react';
 import { cn } from '../../lib/utils';
 
@@ -17,6 +19,8 @@ const navigation = [
   { name: 'Dashboard', href: '/', icon: LayoutDashboard },
   { name: 'Clients', href: '/clients', icon: Users },
   { name: 'Vendors', href: '/vendors', icon: Building2 },
+  { name: 'Branches', href: '/branches', icon: MapPin },
+  { name: 'Bank Accounts', href: '/bank-accounts', icon: Landmark },
   { name: 'Purchase Orders', href: '/purchase-orders', icon: ShoppingCart },
   { name: 'Invoices', href: '/invoices', icon: FileText },
   { name: 'Payments', href: '/payments', icon: CreditCard },

@@ -5,6 +5,8 @@ import type { Payment, PaymentCreate, Client, Vendor, Invoice } from '../../type
 import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
 import { Select } from '../../components/ui/Select';
+import { BranchSelector } from '../../components/ui/BranchSelector';
+import { BankAccountSelector } from '../../components/ui/BankAccountSelector';
 import { clientApi, vendorApi, invoiceApi } from '../../services/api';
 import { useEffect } from 'react';
 
@@ -28,6 +30,8 @@ export function PaymentForm({ payment, onSubmit, onClose, isLoading }: PaymentFo
     defaultValues: payment ? {
       payment_date: payment.payment_date,
       payment_type: payment.payment_type,
+      branch_id: payment.branch_id,
+      bank_account_id: payment.bank_account_id,
       client_id: payment.client_id || undefined,
       vendor_id: payment.vendor_id || undefined,
       invoice_id: payment.invoice_id || undefined,
@@ -36,7 +40,6 @@ export function PaymentForm({ payment, onSubmit, onClose, isLoading }: PaymentFo
       tcs_amount: payment.tcs_amount || 0,
       payment_mode: payment.payment_mode,
       reference_number: payment.reference_number || undefined,
-      bank_name: payment.bank_name || undefined,
       notes: payment.notes || undefined,
     } : {
       payment_date: new Date().toISOString().split('T')[0],
@@ -50,6 +53,7 @@ export function PaymentForm({ payment, onSubmit, onClose, isLoading }: PaymentFo
   // Watch form fields for conditional rendering
   const paymentType = watch('payment_type');
   const paymentMode = watch('payment_mode');
+  const branchId = watch('branch_id');
   const grossAmount = watch('gross_amount') || 0;
   const tdsAmount = watch('tds_amount') || 0;
   const tcsAmount = watch('tcs_amount') || 0;
@@ -114,6 +118,8 @@ export function PaymentForm({ payment, onSubmit, onClose, isLoading }: PaymentFo
     const submitData: PaymentCreate = {
       payment_date: data.payment_date,
       payment_type: data.payment_type,
+      branch_id: Number(data.branch_id),
+      bank_account_id: Number(data.bank_account_id),
       gross_amount: Number(data.gross_amount),
       tds_amount: Number(data.tds_amount) || 0,
       tcs_amount: Number(data.tcs_amount) || 0,
@@ -122,8 +128,6 @@ export function PaymentForm({ payment, onSubmit, onClose, isLoading }: PaymentFo
       vendor_id: data.payment_type === 'PAYMENT' ? Number(data.vendor_id) : undefined,
       invoice_id: data.invoice_id ? Number(data.invoice_id) : undefined,
       reference_number: data.reference_number?.trim() || undefined,
-      bank_name: data.bank_name?.trim() || undefined,
-      bank_account: data.bank_account?.trim() || undefined,
       cheque_date: data.cheque_date || undefined,
       notes: data.notes?.trim() || undefined,
     };
@@ -168,6 +172,27 @@ export function PaymentForm({ payment, onSubmit, onClose, isLoading }: PaymentFo
                   <span>Payment (to Vendor)</span>
                 </label>
               </div>
+            </div>
+
+            {/* Branch */}
+            <div>
+              <BranchSelector
+                value={branchId || ''}
+                onChange={(id) => setValue('branch_id', id, { shouldValidate: true })}
+                required
+                error={errors.branch_id?.message}
+              />
+            </div>
+
+            {/* Bank Account */}
+            <div>
+              <BankAccountSelector
+                branchId={branchId || null}
+                value={watch('bank_account_id') || ''}
+                onChange={(id) => setValue('bank_account_id', id, { shouldValidate: true })}
+                required
+                error={errors.bank_account_id?.message}
+              />
             </div>
 
             {/* Payment Date */}
@@ -295,22 +320,6 @@ export function PaymentForm({ payment, onSubmit, onClose, isLoading }: PaymentFo
                   placeholder="Transaction/Cheque/UPI ID"
                 />
                 {errors.reference_number && <p className="text-red-500 text-sm mt-1">Required</p>}
-              </div>
-            )}
-
-            {/* Bank Name (conditional) */}
-            {(paymentMode === 'BANK_TRANSFER' || paymentMode === 'CHEQUE') && (
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Bank Name</label>
-                <Input {...register('bank_name')} placeholder="Enter bank name" />
-              </div>
-            )}
-
-            {/* Bank Account (conditional) */}
-            {(paymentMode === 'BANK_TRANSFER' || paymentMode === 'CHEQUE') && (
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Bank Account</label>
-                <Input {...register('bank_account')} placeholder="Account number" />
               </div>
             )}
 

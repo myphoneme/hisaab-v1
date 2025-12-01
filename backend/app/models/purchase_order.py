@@ -24,6 +24,9 @@ class PurchaseOrder(BaseModel):
     # Client
     client_id = Column(Integer, ForeignKey("clients.id"), nullable=False)
 
+    # Branch
+    branch_id = Column(Integer, ForeignKey("branches.id"), nullable=False, index=True)
+
     # Subject/Description
     subject = Column(String(500), nullable=True)
 
@@ -50,6 +53,7 @@ class PurchaseOrder(BaseModel):
 
     # Relationships
     client = relationship("Client", back_populates="purchase_orders")
+    branch = relationship("Branch", back_populates="purchase_orders")
     items = relationship("PurchaseOrderItem", back_populates="purchase_order", cascade="all, delete-orphan")
     invoices = relationship("Invoice", back_populates="purchase_order")
 

@@ -95,6 +95,65 @@ export interface VendorCreate {
   code?: string;
 }
 
+// Branch Types
+export interface Branch extends BaseEntity {
+  branch_name: string;
+  branch_code: string;
+  gstin: string;
+  state: string;
+  state_code: string;
+  address: string;
+  city: string;
+  pincode: string;
+  email: string | null;
+  phone: string | null;
+  is_active: boolean;
+  is_head_office: boolean;
+}
+
+export interface BranchCreate {
+  branch_name: string;
+  branch_code: string;
+  gstin: string;
+  state: string;
+  state_code: string;
+  address: string;
+  city: string;
+  pincode: string;
+  email?: string;
+  phone?: string;
+  is_head_office?: boolean;
+}
+
+// Bank Account Types
+export interface BankAccount extends BaseEntity {
+  branch_id: number;
+  account_name: string;
+  bank_name: string;
+  account_number: string;
+  ifsc_code: string;
+  branch_name: string | null;
+  account_type: 'SAVINGS' | 'CURRENT' | 'OVERDRAFT' | 'CASH_CREDIT';
+  upi_id: string | null;
+  swift_code: string | null;
+  is_active: boolean;
+  is_default: boolean;
+  branch?: Branch;
+}
+
+export interface BankAccountCreate {
+  branch_id: number;
+  account_name: string;
+  bank_name: string;
+  account_number: string;
+  ifsc_code: string;
+  branch_name?: string;
+  account_type?: 'SAVINGS' | 'CURRENT' | 'OVERDRAFT' | 'CASH_CREDIT';
+  upi_id?: string;
+  swift_code?: string;
+  is_default?: boolean;
+}
+
 // Purchase Order Types
 export interface PurchaseOrderItem {
   id: number;
@@ -131,6 +190,8 @@ export interface PurchaseOrder extends BaseEntity {
   po_date: string;
   client_id: number;
   client?: Client;
+  branch_id: number;
+  branch?: Branch;
   reference_number: string | null;
   subject: string | null;
   discount_percent: number;
@@ -153,6 +214,7 @@ export interface PurchaseOrderCreate {
   po_date: string;
   reference_number?: string;
   client_id: number;
+  branch_id: number;
   subject?: string;
   discount_percent?: number;
   notes?: string;
@@ -187,6 +249,8 @@ export interface Invoice extends BaseEntity {
   vendor_id: number | null;
   client?: Client;
   vendor?: Vendor;
+  branch_id: number;
+  branch?: Branch;
   po_id: number | null;
   po?: PurchaseOrder;
   place_of_supply: string;
@@ -220,6 +284,10 @@ export interface Payment extends BaseEntity {
   vendor_id: number | null;
   client?: Client;
   vendor?: Vendor;
+  branch_id: number;
+  branch?: Branch;
+  bank_account_id: number;
+  bank_account?: BankAccount;
   invoice_id: number | null;
   invoice?: Invoice;
   gross_amount: number;
@@ -228,7 +296,6 @@ export interface Payment extends BaseEntity {
   net_amount: number;
   payment_mode: 'CASH' | 'BANK_TRANSFER' | 'CHEQUE' | 'UPI' | 'CARD';
   reference_number: string | null;
-  bank_name: string | null;
   notes: string | null;
   status: 'PENDING' | 'COMPLETED' | 'CANCELLED';
 }
@@ -238,14 +305,14 @@ export interface PaymentCreate {
   payment_type: 'RECEIPT' | 'PAYMENT';
   client_id?: number;
   vendor_id?: number;
+  branch_id: number;
+  bank_account_id: number;
   invoice_id?: number;
   gross_amount: number;
   tds_amount?: number;
   tcs_amount?: number;
   payment_mode: 'CASH' | 'BANK_TRANSFER' | 'CHEQUE' | 'UPI' | 'CARD';
   reference_number?: string;
-  bank_name?: string;
-  bank_account?: string;
   cheque_date?: string;
   notes?: string;
 }

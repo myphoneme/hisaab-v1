@@ -18,78 +18,113 @@ router = APIRouter()
 
 @router.get("/dashboard")
 async def get_dashboard_stats(
+    branch_id: Optional[int] = None,
+    from_date: Optional[date] = None,
+    to_date: Optional[date] = None,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """Get dashboard statistics."""
+    """Get dashboard statistics with optional branch and date filtering."""
     today = datetime.now().date()
     month_start = today.replace(day=1)
 
+    # Use provided dates or default to current month
+    start_date = from_date if from_date else month_start
+    end_date = to_date if to_date else today
+
     # Total Receivables (Sales invoices with amount due > 0)
-    receivables_result = await db.execute(
+    receivables_query = (
         select(func.sum(Invoice.amount_due))
         .where(Invoice.invoice_type == InvoiceType.SALES)
         .where(Invoice.status.not_in([InvoiceStatus.PAID, InvoiceStatus.CANCELLED]))
     )
+    if branch_id:
+        receivables_query = receivables_query.where(Invoice.branch_id == branch_id)
+    receivables_result = await db.execute(receivables_query)
     total_receivables = receivables_result.scalar() or Decimal('0')
 
     # Total Payables (Purchase invoices with amount due > 0)
-    payables_result = await db.execute(
+    payables_query = (
         select(func.sum(Invoice.amount_due))
         .where(Invoice.invoice_type == InvoiceType.PURCHASE)
         .where(Invoice.status.not_in([InvoiceStatus.PAID, InvoiceStatus.CANCELLED]))
     )
+    if branch_id:
+        payables_query = payables_query.where(Invoice.branch_id == branch_id)
+    payables_result = await db.execute(payables_query)
     total_payables = payables_result.scalar() or Decimal('0')
 
-    # Revenue this month
-    revenue_result = await db.execute(
+    # Revenue for period
+    revenue_query = (
         select(func.sum(Invoice.total_amount))
         .where(Invoice.invoice_type == InvoiceType.SALES)
-        .where(Invoice.invoice_date >= month_start)
+        .where(Invoice.invoice_date >= start_date)
+        .where(Invoice.invoice_date <= end_date)
         .where(Invoice.status != InvoiceStatus.CANCELLED)
     )
+    if branch_id:
+        revenue_query = revenue_query.where(Invoice.branch_id == branch_id)
+    revenue_result = await db.execute(revenue_query)
     revenue_this_month = revenue_result.scalar() or Decimal('0')
 
-    # Expenses this month
-    expenses_result = await db.execute(
+    # Expenses for period
+    expenses_query = (
         select(func.sum(Invoice.total_amount))
         .where(Invoice.invoice_type == InvoiceType.PURCHASE)
-        .where(Invoice.invoice_date >= month_start)
+        .where(Invoice.invoice_date >= start_date)
+        .where(Invoice.invoice_date <= end_date)
         .where(Invoice.status != InvoiceStatus.CANCELLED)
     )
+    if branch_id:
+        expenses_query = expenses_query.where(Invoice.branch_id == branch_id)
+    expenses_result = await db.execute(expenses_query)
     expenses_this_month = expenses_result.scalar() or Decimal('0')
 
     # Pending invoices count
-    pending_result = await db.execute(
+    pending_query = (
         select(func.count())
         .where(Invoice.invoice_type == InvoiceType.SALES)
         .where(Invoice.status.in_([InvoiceStatus.SENT, InvoiceStatus.PARTIAL]))
     )
+    if branch_id:
+        pending_query = pending_query.where(Invoice.branch_id == branch_id)
+    pending_result = await db.execute(pending_query)
     pending_invoices = pending_result.scalar() or 0
 
     # Overdue invoices count
-    overdue_result = await db.execute(
+    overdue_query = (
         select(func.count())
         .where(Invoice.invoice_type == InvoiceType.SALES)
         .where(Invoice.status == InvoiceStatus.OVERDUE)
     )
+    if branch_id:
+        overdue_query = overdue_query.where(Invoice.branch_id == branch_id)
+    overdue_result = await db.execute(overdue_query)
     overdue_invoices = overdue_result.scalar() or 0
 
-    # GST Liability (Output - Input for current month)
-    output_gst_result = await db.execute(
+    # GST Liability (Output - Input for current period)
+    output_gst_query = (
         select(func.sum(Invoice.cgst_amount + Invoice.sgst_amount + Invoice.igst_amount))
         .where(Invoice.invoice_type == InvoiceType.SALES)
-        .where(Invoice.invoice_date >= month_start)
+        .where(Invoice.invoice_date >= start_date)
+        .where(Invoice.invoice_date <= end_date)
         .where(Invoice.status != InvoiceStatus.CANCELLED)
     )
+    if branch_id:
+        output_gst_query = output_gst_query.where(Invoice.branch_id == branch_id)
+    output_gst_result = await db.execute(output_gst_query)
     output_gst = output_gst_result.scalar() or Decimal('0')
 
-    input_gst_result = await db.execute(
+    input_gst_query = (
         select(func.sum(Invoice.cgst_amount + Invoice.sgst_amount + Invoice.igst_amount))
         .where(Invoice.invoice_type == InvoiceType.PURCHASE)
-        .where(Invoice.invoice_date >= month_start)
+        .where(Invoice.invoice_date >= start_date)
+        .where(Invoice.invoice_date <= end_date)
         .where(Invoice.status != InvoiceStatus.CANCELLED)
     )
+    if branch_id:
+        input_gst_query = input_gst_query.where(Invoice.branch_id == branch_id)
+    input_gst_result = await db.execute(input_gst_query)
     input_gst = input_gst_result.scalar() or Decimal('0')
 
     gst_liability = output_gst - input_gst

@@ -8,19 +8,23 @@ import { Card, CardContent, CardHeader } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
 import { Select } from '../../components/ui/Select';
+import { BranchSelector } from '../../components/ui/BranchSelector';
 import { formatCurrency } from '../../lib/utils';
 import { PurchaseOrderForm } from './PurchaseOrderForm';
 
 export function PurchaseOrders() {
   const [searchTerm, setSearchTerm] = useState('');
+  const [branchId, setBranchId] = useState<number | string>('');
   const [showForm, setShowForm] = useState(false);
   const [editingPO, setEditingPO] = useState<PurchaseOrder | null>(null);
   const queryClient = useQueryClient();
 
   const { data: orders, isLoading } = useQuery<PurchaseOrder[]>({
-    queryKey: ['purchase-orders'],
+    queryKey: ['purchase-orders', branchId],
     queryFn: async () => {
-      const response: any = await purchaseOrderApi.getAll();
+      const params: any = {};
+      if (branchId) params.branch_id = branchId;
+      const response: any = await purchaseOrderApi.getAll(params);
       // Backend returns PaginatedResponse with items array
       return response?.items || [];
     },
@@ -275,15 +279,25 @@ export function PurchaseOrders() {
 
       <Card>
         <CardHeader>
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-            <Input
-              type="text"
-              placeholder="Search purchase orders..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="pl-10"
-            />
+          <div className="flex gap-4">
+            <div className="w-64">
+              <BranchSelector
+                value={branchId}
+                onChange={setBranchId}
+                label=""
+                required={false}
+              />
+            </div>
+            <div className="relative flex-1">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+              <Input
+                type="text"
+                placeholder="Search purchase orders..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="pl-10"
+              />
+            </div>
           </div>
         </CardHeader>
         <CardContent>

@@ -70,6 +70,7 @@ def calculate_invoice_item_amounts(item_data: dict, is_igst: bool) -> dict:
 async def get_invoices(
     page: int = Query(1, ge=1),
     page_size: int = Query(10, ge=1, le=100),
+    branch_id: Optional[int] = None,
     invoice_type: Optional[InvoiceType] = None,
     client_id: Optional[int] = None,
     vendor_id: Optional[int] = None,
@@ -79,13 +80,16 @@ async def get_invoices(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """Get all invoices with pagination."""
+    """Get all invoices with pagination and filtering by branch, dates, etc."""
     query = select(Invoice).options(
         selectinload(Invoice.items),
         selectinload(Invoice.client),
-        selectinload(Invoice.vendor)
+        selectinload(Invoice.vendor),
+        selectinload(Invoice.branch)
     )
 
+    if branch_id:
+        query = query.where(Invoice.branch_id == branch_id)
     if invoice_type:
         query = query.where(Invoice.invoice_type == invoice_type)
     if client_id:

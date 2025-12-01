@@ -5,6 +5,7 @@ import { Plus, Trash2, Save, X } from 'lucide-react';
 import { Card, CardContent, CardHeader } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
+import { BranchSelector } from '../../components/ui/BranchSelector';
 import { invoiceApi, clientApi, vendorApi } from '../../services/api';
 import type { Client, Vendor } from '../../types';
 
@@ -23,6 +24,7 @@ interface InvoiceItem {
 interface InvoiceFormData {
   invoice_date: string;
   invoice_type: 'SALES' | 'PURCHASE' | 'CREDIT_NOTE' | 'DEBIT_NOTE';
+  branch_id: number;
   client_id?: number;
   vendor_id?: number;
   place_of_supply: string;
@@ -50,6 +52,7 @@ export function InvoiceForm() {
   const [formData, setFormData] = useState<InvoiceFormData>({
     invoice_date: new Date().toISOString().split('T')[0],
     invoice_type: 'SALES',
+    branch_id: 0,
     place_of_supply: '',
     place_of_supply_code: '',
     is_igst: false,
@@ -246,6 +249,14 @@ export function InvoiceForm() {
                   <option value="CREDIT_NOTE">Credit Note</option>
                   <option value="DEBIT_NOTE">Debit Note</option>
                 </select>
+              </div>
+
+              <div>
+                <BranchSelector
+                  value={formData.branch_id}
+                  onChange={(branchId) => handleChange('branch_id', branchId)}
+                  required
+                />
               </div>
 
               <div>
