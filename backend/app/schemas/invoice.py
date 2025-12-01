@@ -51,7 +51,7 @@ class InvoiceBase(BaseModel):
     invoice_type: InvoiceType
     client_id: Optional[int] = None
     vendor_id: Optional[int] = None
-    branch_id: int
+    branch_id: Optional[int] = None
     po_id: Optional[int] = None
     place_of_supply: str
     place_of_supply_code: str

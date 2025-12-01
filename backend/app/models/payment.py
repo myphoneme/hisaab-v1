@@ -41,8 +41,8 @@ class Payment(BaseModel):
     vendor_id = Column(Integer, ForeignKey("vendors.id"), nullable=True)
 
     # Branch & Bank Account
-    branch_id = Column(Integer, ForeignKey("branches.id"), nullable=False, index=True)
-    bank_account_id = Column(Integer, ForeignKey("bank_accounts.id"), nullable=False, index=True)
+    branch_id = Column(Integer, ForeignKey("branches.id"), nullable=True, index=True)
+    bank_account_id = Column(Integer, ForeignKey("bank_accounts.id"), nullable=True, index=True)
 
     # Reference to Invoice
     invoice_id = Column(Integer, ForeignKey("invoices.id"), nullable=True)
@@ -57,7 +57,7 @@ class Payment(BaseModel):
     payment_mode = Column(Enum(PaymentMode), nullable=False)
     reference_number = Column(String(100), nullable=True)  # UTR, Cheque No, etc.
 
-    # Bank Details
+    # Bank Details (for manual entry when not using bank_account_id)
     bank_name = Column(String(255), nullable=True)
     bank_account = Column(String(50), nullable=True)
 
@@ -74,5 +74,5 @@ class Payment(BaseModel):
     client = relationship("Client", back_populates="payments")
     vendor = relationship("Vendor", back_populates="payments")
     branch = relationship("Branch", back_populates="payments")
-    bank_account = relationship("BankAccount", back_populates="payments")
+    bank_account_ref = relationship("BankAccount", back_populates="payments")
     invoice = relationship("Invoice", back_populates="payments")

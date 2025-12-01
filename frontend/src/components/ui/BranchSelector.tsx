@@ -4,7 +4,7 @@ import { Select } from './Select';
 import type { Branch } from '../../types';
 
 interface BranchSelectorProps {
-  value: number | string;
+  value: number | string | undefined | null;
   onChange: (branchId: number) => void;
   label?: string;
   required?: boolean;
@@ -49,10 +49,13 @@ export function BranchSelector({
     );
   }
 
+  // Convert value to string for comparison, handle null/undefined/0 as empty
+  const selectValue = value && value !== 0 ? value.toString() : '';
+
   return (
     <Select
       label={label}
-      value={value?.toString() || ''}
+      value={selectValue}
       onChange={handleChange}
       required={required}
       disabled={disabled || isLoading}
@@ -63,7 +66,7 @@ export function BranchSelector({
         {isLoading ? 'Loading branches...' : 'Select Branch'}
       </option>
       {branches?.map((branch) => (
-        <option key={branch.id} value={branch.id}>
+        <option key={branch.id} value={branch.id.toString()}>
           {branch.branch_name} ({branch.branch_code}) - {branch.gstin}
         </option>
       ))}

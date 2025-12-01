@@ -36,4 +36,4 @@ class BankAccount(BaseModel):
 
     # Relationships
     branch = relationship("Branch", back_populates="bank_accounts")
-    payments = relationship("Payment", back_populates="bank_account")
+    payments = relationship("Payment", back_populates="bank_account_ref")

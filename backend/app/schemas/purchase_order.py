@@ -43,7 +43,7 @@ class PurchaseOrderBase(BaseModel):
     po_date: date
     reference_number: Optional[str] = None
     client_id: int
-    branch_id: int
+    branch_id: Optional[int] = None
     subject: Optional[str] = None
     discount_percent: Decimal = Decimal("0")
     notes: Optional[str] = None

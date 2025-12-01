@@ -25,7 +25,7 @@ class PurchaseOrder(BaseModel):
     client_id = Column(Integer, ForeignKey("clients.id"), nullable=False)
 
     # Branch
-    branch_id = Column(Integer, ForeignKey("branches.id"), nullable=False, index=True)
+    branch_id = Column(Integer, ForeignKey("branches.id"), nullable=True, index=True)
 
     # Subject/Description
     subject = Column(String(500), nullable=True)

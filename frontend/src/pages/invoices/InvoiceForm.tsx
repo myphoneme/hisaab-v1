@@ -7,7 +7,7 @@ import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
 import { BranchSelector } from '../../components/ui/BranchSelector';
 import { invoiceApi, clientApi, vendorApi } from '../../services/api';
-import type { Client, Vendor } from '../../types';
+import type { Client, Vendor, Invoice } from '../../types';
 
 interface InvoiceItem {
   serial_no: number;
@@ -24,7 +24,7 @@ interface InvoiceItem {
 interface InvoiceFormData {
   invoice_date: string;
   invoice_type: 'SALES' | 'PURCHASE' | 'CREDIT_NOTE' | 'DEBIT_NOTE';
-  branch_id: number;
+  branch_id?: number;
   client_id?: number;
   vendor_id?: number;
   place_of_supply: string;
@@ -52,7 +52,7 @@ export function InvoiceForm() {
   const [formData, setFormData] = useState<InvoiceFormData>({
     invoice_date: new Date().toISOString().split('T')[0],
     invoice_type: 'SALES',
-    branch_id: 0,
+    branch_id: undefined,
     place_of_supply: '',
     place_of_supply_code: '',
     is_igst: false,
@@ -80,6 +80,52 @@ export function InvoiceForm() {
       },
     ],
   });
+
+  // Fetch existing invoice for edit mode
+  const { data: existingInvoice, isLoading: isLoadingInvoice } = useQuery<Invoice>({
+    queryKey: ['invoice', id],
+    queryFn: () => invoiceApi.getById(Number(id)),
+    enabled: isEdit,
+  });
+
+  // Populate form with existing invoice data
+  useEffect(() => {
+    if (existingInvoice) {
+      const mappedItems = existingInvoice.items.map((item, index) => ({
+        serial_no: item.serial_no || index + 1,
+        description: item.description,
+        hsn_sac: item.hsn_sac || '',
+        quantity: Number(item.quantity),
+        unit: item.unit || 'NOS',
+        rate: Number(item.rate),
+        discount_percent: Number(item.discount_percent) || 0,
+        gst_rate: Number(item.gst_rate) || 18,
+        cess_rate: Number(item.cess_rate) || 0,
+      }));
+
+      setFormData({
+        invoice_date: existingInvoice.invoice_date.split('T')[0],
+        invoice_type: existingInvoice.invoice_type,
+        branch_id: existingInvoice.branch_id ?? undefined,
+        client_id: existingInvoice.client_id ?? undefined,
+        vendor_id: existingInvoice.vendor_id ?? undefined,
+        place_of_supply: existingInvoice.place_of_supply || '',
+        place_of_supply_code: existingInvoice.place_of_supply_code || '',
+        is_igst: existingInvoice.is_igst,
+        reverse_charge: existingInvoice.reverse_charge || false,
+        discount_percent: existingInvoice.discount_percent || 0,
+        tds_applicable: existingInvoice.tds_applicable || false,
+        tds_section: existingInvoice.tds_section || '',
+        tds_rate: existingInvoice.tds_rate || 0,
+        tcs_applicable: existingInvoice.tcs_applicable || false,
+        tcs_rate: existingInvoice.tcs_rate || 0,
+        due_date: existingInvoice.due_date.split('T')[0],
+        notes: existingInvoice.notes || '',
+        terms_conditions: existingInvoice.terms_conditions || '',
+        items: mappedItems,
+      });
+    }
+  }, [existingInvoice]);
 
   // Fetch clients and vendors
   const { data: clients = [] } = useQuery<Client[]>({
@@ -207,6 +253,15 @@ export function InvoiceForm() {
 
   const totals = calculateTotals();
 
+  // Show loading state when fetching existing invoice
+  if (isEdit && isLoadingInvoice) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="text-gray-500">Loading invoice data...</div>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
@@ -255,7 +310,7 @@ export function InvoiceForm() {
                 <BranchSelector
                   value={formData.branch_id}
                   onChange={(branchId) => handleChange('branch_id', branchId)}
-                  required
+                  required={false}
                 />
               </div>
 

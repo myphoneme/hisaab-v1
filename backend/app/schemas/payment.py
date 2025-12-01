@@ -15,8 +15,8 @@ class PaymentBase(BaseModel):
     payment_type: PaymentType
     client_id: Optional[int] = None
     vendor_id: Optional[int] = None
-    branch_id: int
-    bank_account_id: int
+    branch_id: Optional[int] = None
+    bank_account_id: Optional[int] = None
     invoice_id: Optional[int] = None
     gross_amount: Decimal
     tds_amount: Decimal = Decimal("0")
@@ -56,7 +56,7 @@ class PaymentResponse(PaymentBase):
     client: Optional[ClientResponse] = None
     vendor: Optional[VendorResponse] = None
     branch: Optional[BranchResponse] = None
-    bank_account: Optional[BankAccountResponse] = None
+    bank_account_ref: Optional[BankAccountResponse] = None
     created_at: datetime
     updated_at: datetime
 

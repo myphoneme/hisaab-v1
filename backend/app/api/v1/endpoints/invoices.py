@@ -134,7 +134,8 @@ async def get_invoice(
         .options(
             selectinload(Invoice.items),
             selectinload(Invoice.client),
-            selectinload(Invoice.vendor)
+            selectinload(Invoice.vendor),
+            selectinload(Invoice.branch)
         )
         .where(Invoice.id == invoice_id)
     )
@@ -255,7 +256,8 @@ async def create_invoice(
         .options(
             selectinload(Invoice.items),
             selectinload(Invoice.client),
-            selectinload(Invoice.vendor)
+            selectinload(Invoice.vendor),
+            selectinload(Invoice.branch)
         )
         .where(Invoice.id == invoice.id)
     )
@@ -355,7 +357,8 @@ async def update_invoice(
         .options(
             selectinload(Invoice.items),
             selectinload(Invoice.client),
-            selectinload(Invoice.vendor)
+            selectinload(Invoice.vendor),
+            selectinload(Invoice.branch)
         )
         .where(Invoice.id == invoice.id)
     )
@@ -371,7 +374,14 @@ async def update_invoice_status(
 ):
     """Update invoice status."""
     result = await db.execute(
-        select(Invoice).options(selectinload(Invoice.items)).where(Invoice.id == invoice_id)
+        select(Invoice)
+        .options(
+            selectinload(Invoice.items),
+            selectinload(Invoice.client),
+            selectinload(Invoice.vendor),
+            selectinload(Invoice.branch)
+        )
+        .where(Invoice.id == invoice_id)
     )
     invoice = result.scalar_one_or_none()
     if not invoice:
@@ -380,7 +390,19 @@ async def update_invoice_status(
     invoice.status = status_update
     await db.commit()
     await db.refresh(invoice)
-    return invoice
+
+    # Reload with relationships
+    result = await db.execute(
+        select(Invoice)
+        .options(
+            selectinload(Invoice.items),
+            selectinload(Invoice.client),
+            selectinload(Invoice.vendor),
+            selectinload(Invoice.branch)
+        )
+        .where(Invoice.id == invoice.id)
+    )
+    return result.scalar_one()
 
 
 @router.delete("/{invoice_id}", response_model=Message)

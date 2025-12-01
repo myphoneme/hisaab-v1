@@ -87,7 +87,7 @@ class LedgerEntry(BaseModel):
     vendor_id = Column(Integer, ForeignKey("vendors.id"), nullable=True)
 
     # Branch
-    branch_id = Column(Integer, ForeignKey("branches.id"), nullable=False, index=True)
+    branch_id = Column(Integer, ForeignKey("branches.id"), nullable=True, index=True)
 
     # Financial Year
     financial_year = Column(String(10), nullable=False)  # e.g., "2024-25"

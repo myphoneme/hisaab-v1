@@ -40,6 +40,11 @@ async def get_dashboard_stats(
     )
     if branch_id:
         receivables_query = receivables_query.where(Invoice.branch_id == branch_id)
+    # Filter by invoice date if date range is provided
+    if from_date:
+        receivables_query = receivables_query.where(Invoice.invoice_date >= start_date)
+    if to_date:
+        receivables_query = receivables_query.where(Invoice.invoice_date <= end_date)
     receivables_result = await db.execute(receivables_query)
     total_receivables = receivables_result.scalar() or Decimal('0')
 
@@ -51,6 +56,11 @@ async def get_dashboard_stats(
     )
     if branch_id:
         payables_query = payables_query.where(Invoice.branch_id == branch_id)
+    # Filter by invoice date if date range is provided
+    if from_date:
+        payables_query = payables_query.where(Invoice.invoice_date >= start_date)
+    if to_date:
+        payables_query = payables_query.where(Invoice.invoice_date <= end_date)
     payables_result = await db.execute(payables_query)
     total_payables = payables_result.scalar() or Decimal('0')
 
@@ -88,6 +98,10 @@ async def get_dashboard_stats(
     )
     if branch_id:
         pending_query = pending_query.where(Invoice.branch_id == branch_id)
+    if from_date:
+        pending_query = pending_query.where(Invoice.invoice_date >= start_date)
+    if to_date:
+        pending_query = pending_query.where(Invoice.invoice_date <= end_date)
     pending_result = await db.execute(pending_query)
     pending_invoices = pending_result.scalar() or 0
 
@@ -99,6 +113,10 @@ async def get_dashboard_stats(
     )
     if branch_id:
         overdue_query = overdue_query.where(Invoice.branch_id == branch_id)
+    if from_date:
+        overdue_query = overdue_query.where(Invoice.invoice_date >= start_date)
+    if to_date:
+        overdue_query = overdue_query.where(Invoice.invoice_date <= end_date)
     overdue_result = await db.execute(overdue_query)
     overdue_invoices = overdue_result.scalar() or 0
 
@@ -129,12 +147,16 @@ async def get_dashboard_stats(
 
     gst_liability = output_gst - input_gst
 
-    # TDS Liability (TDS deducted this month)
-    tds_result = await db.execute(
+    # TDS Liability (TDS deducted in period)
+    tds_query = (
         select(func.sum(Invoice.tds_amount))
-        .where(Invoice.invoice_date >= month_start)
+        .where(Invoice.invoice_date >= start_date)
+        .where(Invoice.invoice_date <= end_date)
         .where(Invoice.tds_applicable == True)
     )
+    if branch_id:
+        tds_query = tds_query.where(Invoice.branch_id == branch_id)
+    tds_result = await db.execute(tds_query)
     tds_liability = tds_result.scalar() or Decimal('0')
 
     return {

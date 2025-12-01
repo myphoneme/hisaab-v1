@@ -34,7 +34,7 @@ class Invoice(BaseModel):
     vendor_id = Column(Integer, ForeignKey("vendors.id"), nullable=True)
 
     # Branch
-    branch_id = Column(Integer, ForeignKey("branches.id"), nullable=False, index=True)
+    branch_id = Column(Integer, ForeignKey("branches.id"), nullable=True, index=True)
 
     # Reference to PO
     po_id = Column(Integer, ForeignKey("purchase_orders.id"), nullable=True)

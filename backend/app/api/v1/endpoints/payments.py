@@ -37,7 +37,7 @@ async def get_payments(
         selectinload(Payment.client),
         selectinload(Payment.vendor),
         selectinload(Payment.branch),
-        selectinload(Payment.bank_account)
+        selectinload(Payment.bank_account_ref)
     )
 
     if branch_id:
@@ -83,7 +83,12 @@ async def get_payment(
     """Get a specific payment."""
     result = await db.execute(
         select(Payment)
-        .options(selectinload(Payment.client), selectinload(Payment.vendor))
+        .options(
+            selectinload(Payment.client),
+            selectinload(Payment.vendor),
+            selectinload(Payment.branch),
+            selectinload(Payment.bank_account_ref)
+        )
         .where(Payment.id == payment_id)
     )
     payment = result.scalar_one_or_none()
@@ -112,6 +117,8 @@ async def create_payment(
         payment_type=payment_data.payment_type,
         client_id=payment_data.client_id,
         vendor_id=payment_data.vendor_id,
+        branch_id=payment_data.branch_id,
+        bank_account_id=payment_data.bank_account_id,
         invoice_id=payment_data.invoice_id,
         gross_amount=payment_data.gross_amount,
         tds_amount=payment_data.tds_amount,
@@ -119,8 +126,6 @@ async def create_payment(
         net_amount=net_amount,
         payment_mode=payment_data.payment_mode,
         reference_number=payment_data.reference_number,
-        bank_name=payment_data.bank_name,
-        bank_account=payment_data.bank_account,
         cheque_date=payment_data.cheque_date,
         notes=payment_data.notes,
         status=PaymentStatus.COMPLETED,
@@ -147,7 +152,12 @@ async def create_payment(
     # Reload with relationships
     result = await db.execute(
         select(Payment)
-        .options(selectinload(Payment.client), selectinload(Payment.vendor))
+        .options(
+            selectinload(Payment.client),
+            selectinload(Payment.vendor),
+            selectinload(Payment.branch),
+            selectinload(Payment.bank_account_ref)
+        )
         .where(Payment.id == payment.id)
     )
     return result.scalar_one()
@@ -163,7 +173,12 @@ async def update_payment(
     """Update a payment."""
     result = await db.execute(
         select(Payment)
-        .options(selectinload(Payment.client), selectinload(Payment.vendor))
+        .options(
+            selectinload(Payment.client),
+            selectinload(Payment.vendor),
+            selectinload(Payment.branch),
+            selectinload(Payment.bank_account_ref)
+        )
         .where(Payment.id == payment_id)
     )
     payment = result.scalar_one_or_none()
@@ -231,7 +246,12 @@ async def update_payment(
     # Reload with relationships
     result = await db.execute(
         select(Payment)
-        .options(selectinload(Payment.client), selectinload(Payment.vendor))
+        .options(
+            selectinload(Payment.client),
+            selectinload(Payment.vendor),
+            selectinload(Payment.branch),
+            selectinload(Payment.bank_account_ref)
+        )
         .where(Payment.id == payment.id)
     )
     return result.scalar_one()

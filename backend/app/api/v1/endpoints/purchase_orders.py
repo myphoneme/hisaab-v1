@@ -113,7 +113,11 @@ async def get_purchase_order(
     """Get a specific purchase order."""
     result = await db.execute(
         select(PurchaseOrder)
-        .options(selectinload(PurchaseOrder.items), selectinload(PurchaseOrder.client))
+        .options(
+            selectinload(PurchaseOrder.items),
+            selectinload(PurchaseOrder.client),
+            selectinload(PurchaseOrder.branch)
+        )
         .where(PurchaseOrder.id == po_id)
     )
     po = result.scalar_one_or_none()
@@ -146,6 +150,7 @@ async def create_purchase_order(
         po_number=po_number,
         po_date=po_data.po_date,
         client_id=po_data.client_id,
+        branch_id=po_data.branch_id,
         reference_number=po_data.reference_number,
         subject=po_data.subject,
         discount_percent=po_data.discount_percent,
@@ -198,7 +203,11 @@ async def create_purchase_order(
     # Reload with relationships
     result = await db.execute(
         select(PurchaseOrder)
-        .options(selectinload(PurchaseOrder.items), selectinload(PurchaseOrder.client))
+        .options(
+            selectinload(PurchaseOrder.items),
+            selectinload(PurchaseOrder.client),
+            selectinload(PurchaseOrder.branch)
+        )
         .where(PurchaseOrder.id == po.id)
     )
     return result.scalar_one()
@@ -214,7 +223,11 @@ async def update_po_status(
     """Update purchase order status."""
     result = await db.execute(
         select(PurchaseOrder)
-        .options(selectinload(PurchaseOrder.items), selectinload(PurchaseOrder.client))
+        .options(
+            selectinload(PurchaseOrder.items),
+            selectinload(PurchaseOrder.client),
+            selectinload(PurchaseOrder.branch)
+        )
         .where(PurchaseOrder.id == po_id)
     )
     po = result.scalar_one_or_none()
