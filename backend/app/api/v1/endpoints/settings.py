@@ -1,6 +1,7 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
+import base64
 
 from app.db.session import get_db
 from app.models.settings import CompanySettings
@@ -136,3 +137,79 @@ async def update_active_company_settings(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to update settings: {str(e)}"
         )
+
+
+@router.post("/logo")
+async def upload_company_logo(
+    file: UploadFile = File(...),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Upload company logo. Accepts PNG, JPG, JPEG. Max size 500KB."""
+    # Validate file type
+    allowed_types = ['image/png', 'image/jpeg', 'image/jpg']
+    if file.content_type not in allowed_types:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid file type. Only PNG, JPG, JPEG are allowed."
+        )
+
+    # Read file content
+    content = await file.read()
+
+    # Validate file size (500KB max)
+    max_size = 500 * 1024  # 500KB
+    if len(content) > max_size:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="File size exceeds 500KB limit."
+        )
+
+    # Convert to base64
+    base64_logo = base64.b64encode(content).decode('utf-8')
+    # Add data URI prefix
+    logo_data = f"data:{file.content_type};base64,{base64_logo}"
+
+    # Get active settings
+    result = await db.execute(
+        select(CompanySettings).where(CompanySettings.is_active == True)
+    )
+    settings = result.scalar_one_or_none()
+
+    if not settings:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Company settings not found. Please create settings first."
+        )
+
+    # Update logo
+    settings.company_logo = logo_data
+    await db.commit()
+    await db.refresh(settings)
+
+    return {"message": "Logo uploaded successfully", "logo": logo_data}
+
+
+@router.delete("/logo")
+async def delete_company_logo(
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Delete company logo."""
+    # Get active settings
+    result = await db.execute(
+        select(CompanySettings).where(CompanySettings.is_active == True)
+    )
+    settings = result.scalar_one_or_none()
+
+    if not settings:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Company settings not found."
+        )
+
+    # Clear logo
+    settings.company_logo = None
+    await db.commit()
+
+    return {"message": "Logo deleted successfully"}

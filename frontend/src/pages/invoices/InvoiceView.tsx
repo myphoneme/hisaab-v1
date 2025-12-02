@@ -235,6 +235,13 @@ export function InvoiceView() {
           <div className="grid grid-cols-2 gap-8 mb-8 pb-8 border-b">
             {/* Company Details (From) */}
             <div>
+              {settings?.company_logo && (
+                <img
+                  src={settings.company_logo}
+                  alt="Company Logo"
+                  className="h-16 mb-3 object-contain"
+                />
+              )}
               <h3 className="text-sm font-semibold text-gray-700 mb-2">FROM:</h3>
               <div className="text-sm">
                 <p className="font-bold text-gray-900">{settings?.company_name || 'Your Company'}</p>

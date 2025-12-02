@@ -254,6 +254,37 @@ export const settingsApi = {
   create: (data: unknown) => api.post<CompanySettings>('/settings', data),
   update: (data: unknown) => api.patch<CompanySettings>('/settings', data),
   updateById: (id: number, data: unknown) => api.patch<CompanySettings>(`/settings/${id}`, data),
+  uploadLogo: async (file: File) => {
+    const formData = new FormData();
+    formData.append('file', file);
+    const token = localStorage.getItem('access_token');
+    const response = await fetch('/api/v1/settings/logo', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+      },
+      body: formData,
+    });
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.detail || 'Failed to upload logo');
+    }
+    return response.json();
+  },
+  deleteLogo: async () => {
+    const token = localStorage.getItem('access_token');
+    const response = await fetch('/api/v1/settings/logo', {
+      method: 'DELETE',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+      },
+    });
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.detail || 'Failed to delete logo');
+    }
+    return response.json();
+  },
 };
 
 // Auth API

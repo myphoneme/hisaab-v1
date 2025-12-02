@@ -1244,7 +1244,8 @@ async def get_party_ledger_pdf(
     from reportlab.lib.pagesizes import A4
     from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
     from reportlab.lib.units import inch, mm
-    from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
+    from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer, Image as RLImage
+    import base64
 
     # Get ledger data using the same logic
     ledger_data = await get_party_ledger(party_type, party_id, from_date, to_date, db, current_user)
@@ -1286,12 +1287,50 @@ async def get_party_ledger_pdf(
 
     elements = []
 
-    # Company Header
+    # Company Header with Logo
     if company:
-        elements.append(Paragraph(company.company_name, title_style))
-        elements.append(Paragraph(f"{company.address}, {company.city}, {company.state} - {company.pincode}", header_style))
-        if company.gstin:
-            elements.append(Paragraph(f"GSTIN: {company.gstin} | PAN: {company.pan}", header_style))
+        # Check if company has a logo
+        logo_element = None
+        if company.company_logo:
+            try:
+                # Extract base64 data (remove data URI prefix if present)
+                logo_data = company.company_logo
+                if logo_data.startswith('data:'):
+                    # Format: data:image/png;base64,xxxxx
+                    logo_data = logo_data.split(',', 1)[1]
+
+                # Decode base64 and create image
+                logo_bytes = base64.b64decode(logo_data)
+                logo_buffer = io.BytesIO(logo_bytes)
+                logo_element = RLImage(logo_buffer, width=50*mm, height=20*mm, kind='proportional')
+            except Exception as e:
+                # If logo fails to load, continue without it
+                print(f"Failed to load logo: {e}")
+                logo_element = None
+
+        if logo_element:
+            # Create header with logo on left, company info on right
+            header_data = [[
+                logo_element,
+                Paragraph(f"<b>{company.company_name}</b><br/>"
+                         f"{company.address}, {company.city}, {company.state} - {company.pincode}<br/>"
+                         f"{'GSTIN: ' + company.gstin + ' | ' if company.gstin else ''}PAN: {company.pan}",
+                         ParagraphStyle('HeaderRight', parent=styles['Normal'], fontSize=9, alignment=2))
+            ]]
+            header_table = Table(header_data, colWidths=[60*mm, 110*mm])
+            header_table.setStyle(TableStyle([
+                ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+                ('ALIGN', (0, 0), (0, 0), 'LEFT'),
+                ('ALIGN', (1, 0), (1, 0), 'RIGHT'),
+            ]))
+            elements.append(header_table)
+        else:
+            # No logo - center company name
+            elements.append(Paragraph(company.company_name, title_style))
+            elements.append(Paragraph(f"{company.address}, {company.city}, {company.state} - {company.pincode}", header_style))
+            if company.gstin:
+                elements.append(Paragraph(f"GSTIN: {company.gstin} | PAN: {company.pan}", header_style))
+
         elements.append(Spacer(1, 10*mm))
 
     # Report Title

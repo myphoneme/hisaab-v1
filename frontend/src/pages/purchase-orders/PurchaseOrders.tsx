@@ -2,8 +2,8 @@ import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Plus, Edit, Trash2, Search, ShoppingCart, Printer } from 'lucide-react';
 import { toast } from 'sonner';
-import { purchaseOrderApi } from '../../services/api';
-import type { PurchaseOrder, PurchaseOrderCreate } from '../../types';
+import { purchaseOrderApi, settingsApi } from '../../services/api';
+import type { PurchaseOrder, PurchaseOrderCreate, CompanySettings } from '../../types';
 import { Card, CardContent, CardHeader } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
@@ -28,6 +28,12 @@ export function PurchaseOrders() {
       // Backend returns PaginatedResponse with items array
       return response?.items || [];
     },
+  });
+
+  // Fetch company settings for print
+  const { data: settings } = useQuery<CompanySettings>({
+    queryKey: ['settings'],
+    queryFn: () => settingsApi.get(),
   });
 
   const deleteMutation = useMutation({
@@ -120,27 +126,43 @@ export function PurchaseOrders() {
     const printWindow = window.open('', '_blank');
     if (!printWindow) return;
 
+    const companyLogo = settings?.company_logo || '';
+    const companyName = settings?.company_name || 'Company Name';
+    const companyAddress = settings?.address || '';
+    const companyCity = settings?.city || '';
+    const companyState = settings?.state || '';
+    const companyPincode = settings?.pincode || '';
+    const companyGstin = settings?.gstin || '';
+    const companyPhone = settings?.phone || '';
+    const companyEmail = settings?.email || '';
+
     const printContent = `
       <!DOCTYPE html>
       <html>
         <head>
           <title>Purchase Order - ${order.po_number}</title>
           <style>
-            body { font-family: Arial, sans-serif; padding: 20px; }
-            .header { text-align: center; margin-bottom: 30px; }
-            .header h1 { margin: 0; color: #333; }
+            body { font-family: Arial, sans-serif; padding: 20px; margin: 0; }
+            .company-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 20px; padding-bottom: 15px; border-bottom: 2px solid #333; }
+            .company-info { flex: 1; }
+            .company-logo { max-height: 70px; margin-bottom: 10px; }
+            .company-name { font-size: 20px; font-weight: bold; color: #333; margin: 0 0 5px 0; }
+            .company-details { font-size: 12px; color: #666; line-height: 1.4; }
+            .po-header { text-align: right; }
+            .po-header h1 { margin: 0; color: #333; font-size: 24px; }
+            .po-header p { margin: 3px 0; font-size: 12px; }
             .details { margin-bottom: 20px; }
             .details table { width: 100%; }
-            .details td { padding: 5px; }
+            .details td { padding: 5px; font-size: 13px; }
             .items { width: 100%; border-collapse: collapse; margin: 20px 0; }
-            .items th, .items td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+            .items th, .items td { border: 1px solid #ddd; padding: 8px; text-align: left; font-size: 12px; }
             .items th { background-color: #f2f2f2; }
             .items td.right { text-align: right; }
             .summary { margin-top: 20px; float: right; width: 300px; }
             .summary table { width: 100%; }
-            .summary td { padding: 5px; }
+            .summary td { padding: 5px; font-size: 13px; }
             .summary .total { font-weight: bold; font-size: 16px; border-top: 2px solid #333; }
-            .notes { margin-top: 40px; clear: both; }
+            .notes { margin-top: 40px; clear: both; font-size: 12px; }
             @media print {
               button { display: none; }
             }
@@ -149,10 +171,23 @@ export function PurchaseOrders() {
         <body>
           <button onclick="window.print()" style="margin-bottom: 20px; padding: 10px 20px; background: #4CAF50; color: white; border: none; border-radius: 4px; cursor: pointer;">Print</button>
 
-          <div class="header">
-            <h1>PURCHASE ORDER</h1>
-            <p><strong>PO Number:</strong> ${order.po_number}</p>
-            <p><strong>Date:</strong> ${new Date(order.po_date).toLocaleDateString('en-IN')}</p>
+          <div class="company-header">
+            <div class="company-info">
+              ${companyLogo ? `<img src="${companyLogo}" alt="Company Logo" class="company-logo" />` : ''}
+              <p class="company-name">${companyName}</p>
+              <div class="company-details">
+                ${companyAddress ? `<p style="margin: 0;">${companyAddress}</p>` : ''}
+                <p style="margin: 0;">${companyCity}${companyState ? `, ${companyState}` : ''} ${companyPincode}</p>
+                ${companyGstin ? `<p style="margin: 0;"><strong>GSTIN:</strong> ${companyGstin}</p>` : ''}
+                ${companyPhone ? `<p style="margin: 0;">Phone: ${companyPhone}</p>` : ''}
+                ${companyEmail ? `<p style="margin: 0;">Email: ${companyEmail}</p>` : ''}
+              </div>
+            </div>
+            <div class="po-header">
+              <h1>PURCHASE ORDER</h1>
+              <p><strong>PO Number:</strong> ${order.po_number}</p>
+              <p><strong>Date:</strong> ${new Date(order.po_date).toLocaleDateString('en-IN')}</p>
+            </div>
           </div>
 
           <div class="details">

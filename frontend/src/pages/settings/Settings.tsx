@@ -1,6 +1,6 @@
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Save } from 'lucide-react';
+import { Save, Upload, Trash2, Image } from 'lucide-react';
 import { toast } from 'sonner';
 import { settingsApi } from '../../services/api';
 import { Card, CardContent } from '../../components/ui/Card';
@@ -36,6 +36,8 @@ function formatErrorMessage(error: any): string {
 export function Settings() {
   const queryClient = useQueryClient();
   const [activeTab, setActiveTab] = useState<'company' | 'tax' | 'preferences' | 'ledger'>('company');
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [isUploadingLogo, setIsUploadingLogo] = useState(false);
 
   const { data: settings, isLoading, error, isError } = useQuery<CompanySettings>({
     queryKey: ['settings'],
@@ -68,6 +70,50 @@ export function Settings() {
       toast.error(errorMessage);
     },
   });
+
+  const handleLogoUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    // Validate file type
+    if (!['image/png', 'image/jpeg', 'image/jpg'].includes(file.type)) {
+      toast.error('Only PNG, JPG, JPEG files are allowed');
+      return;
+    }
+
+    // Validate file size (500KB)
+    if (file.size > 500 * 1024) {
+      toast.error('File size must be less than 500KB');
+      return;
+    }
+
+    setIsUploadingLogo(true);
+    try {
+      await settingsApi.uploadLogo(file);
+      queryClient.invalidateQueries({ queryKey: ['settings'] });
+      toast.success('Logo uploaded successfully!');
+    } catch (error: any) {
+      toast.error(error.message || 'Failed to upload logo');
+    } finally {
+      setIsUploadingLogo(false);
+      // Reset file input
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
+    }
+  };
+
+  const handleLogoDelete = async () => {
+    if (!window.confirm('Are you sure you want to remove the company logo?')) return;
+
+    try {
+      await settingsApi.deleteLogo();
+      queryClient.invalidateQueries({ queryKey: ['settings'] });
+      toast.success('Logo removed successfully!');
+    } catch (error: any) {
+      toast.error(error.message || 'Failed to remove logo');
+    }
+  };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -186,6 +232,60 @@ export function Settings() {
           <CardContent className="p-6">
             {activeTab === 'company' && (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {/* Company Logo Section */}
+                <div className="md:col-span-2 mb-4">
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Company Logo (Optional)
+                  </label>
+                  <div className="flex items-start gap-4">
+                    <div className="w-32 h-32 border-2 border-dashed border-gray-300 rounded-lg flex items-center justify-center bg-gray-50 overflow-hidden">
+                      {currentData.company_logo ? (
+                        <img
+                          src={currentData.company_logo}
+                          alt="Company Logo"
+                          className="max-w-full max-h-full object-contain"
+                        />
+                      ) : (
+                        <Image className="h-12 w-12 text-gray-400" />
+                      )}
+                    </div>
+                    <div className="flex flex-col gap-2">
+                      <input
+                        ref={fileInputRef}
+                        type="file"
+                        accept="image/png,image/jpeg,image/jpg"
+                        onChange={handleLogoUpload}
+                        className="hidden"
+                      />
+                      <Button
+                        type="button"
+                        variant="secondary"
+                        onClick={() => fileInputRef.current?.click()}
+                        disabled={isUploadingLogo || !settings}
+                      >
+                        <Upload className="h-4 w-4 mr-2" />
+                        {isUploadingLogo ? 'Uploading...' : 'Upload Logo'}
+                      </Button>
+                      {currentData.company_logo && (
+                        <Button
+                          type="button"
+                          variant="secondary"
+                          onClick={handleLogoDelete}
+                          className="text-red-600 hover:text-red-700"
+                        >
+                          <Trash2 className="h-4 w-4 mr-2" />
+                          Remove Logo
+                        </Button>
+                      )}
+                      <p className="text-xs text-gray-500">
+                        PNG, JPG, JPEG (max 500KB)
+                        <br />
+                        Logo will appear on PDFs
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
                 <div className="md:col-span-2">
                   <label className="block text-sm font-medium text-gray-700 mb-1">
                     Company Name *

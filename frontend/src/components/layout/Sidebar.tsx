@@ -32,7 +32,7 @@ const navigation = [
 
 export function Sidebar() {
   return (
-    <div className="flex flex-col w-64 bg-gray-900 min-h-screen">
+    <div className="flex flex-col w-64 bg-gray-900 min-h-screen" data-sidebar>
       <div className="flex items-center justify-center h-16 px-4 bg-gray-800">
         <h1 className="text-xl font-bold text-white">Hisaab</h1>
       </div>

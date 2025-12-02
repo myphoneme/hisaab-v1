@@ -6,7 +6,7 @@ export function Header() {
   const { user, logout } = useAuthStore();
 
   return (
-    <header className="bg-white border-b border-gray-200 h-16">
+    <header className="bg-white border-b border-gray-200 h-16" data-header>
       <div className="flex items-center justify-between h-full px-6">
         <div className="flex items-center flex-1">
           <div className="relative w-64">
