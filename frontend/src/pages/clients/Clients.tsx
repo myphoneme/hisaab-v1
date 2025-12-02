@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Plus, Edit, Trash2, Search } from 'lucide-react';
+import { Plus, Edit, Trash2, Search, BookOpen } from 'lucide-react';
 import { toast } from 'sonner';
 import { clientApi } from '../../services/api';
 import type { Client, ClientCreate } from '../../types';
@@ -8,11 +8,13 @@ import { Card, CardContent, CardHeader } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
 import { ClientForm } from './ClientForm';
+import { PartyLedger } from './PartyLedger';
 
 export function Clients() {
   const [searchTerm, setSearchTerm] = useState('');
   const [showForm, setShowForm] = useState(false);
   const [editingClient, setEditingClient] = useState<Client | null>(null);
+  const [ledgerClient, setLedgerClient] = useState<Client | null>(null);
   const queryClient = useQueryClient();
 
   const { data: clients, isLoading } = useQuery<Client[]>({
@@ -190,14 +192,23 @@ export function Clients() {
                       </td>
                       <td className="px-4 py-3 whitespace-nowrap text-right text-sm font-medium">
                         <button
+                          onClick={() => setLedgerClient(client)}
+                          className="text-green-600 hover:text-green-900 mr-3"
+                          title="View Ledger"
+                        >
+                          <BookOpen className="h-4 w-4" />
+                        </button>
+                        <button
                           onClick={() => handleEdit(client)}
                           className="text-blue-600 hover:text-blue-900 mr-3"
+                          title="Edit"
                         >
                           <Edit className="h-4 w-4" />
                         </button>
                         <button
                           onClick={() => handleDelete(client.id)}
                           className="text-red-600 hover:text-red-900"
+                          title="Delete"
                         >
                           <Trash2 className="h-4 w-4" />
                         </button>
@@ -223,6 +234,15 @@ export function Clients() {
           }}
           onClose={handleCloseForm}
           isLoading={createMutation.isPending || updateMutation.isPending}
+        />
+      )}
+
+      {ledgerClient && (
+        <PartyLedger
+          partyType="client"
+          partyId={ledgerClient.id}
+          partyName={ledgerClient.name}
+          onClose={() => setLedgerClient(null)}
         />
       )}
     </div>

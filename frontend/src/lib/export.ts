@@ -132,3 +132,13 @@ export const trialBalanceExportColumns: ExportColumn[] = [
   { key: 'debit', header: 'Debit', formatter: formatCurrencyForExport },
   { key: 'credit', header: 'Credit', formatter: formatCurrencyForExport },
 ];
+
+export const partyLedgerExportColumns: ExportColumn[] = [
+  { key: 'date', header: 'Date', formatter: formatDateForExport },
+  { key: 'voucher_number', header: 'Voucher No' },
+  { key: 'type', header: 'Type' },
+  { key: 'description', header: 'Description' },
+  { key: 'debit', header: 'Debit', formatter: formatCurrencyForExport },
+  { key: 'credit', header: 'Credit', formatter: formatCurrencyForExport },
+  { key: 'balance', header: 'Balance', formatter: formatCurrencyForExport },
+];

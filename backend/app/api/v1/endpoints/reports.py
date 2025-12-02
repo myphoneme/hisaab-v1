@@ -1,10 +1,12 @@
 from typing import Optional, List
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, Query, HTTPException
+from fastapi.responses import StreamingResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func, case
 from sqlalchemy.orm import selectinload
 from datetime import date, datetime, timedelta
 from decimal import Decimal
+import io
 
 from app.db.session import get_db
 from app.models.invoice import Invoice, InvoiceType, InvoiceStatus
@@ -12,6 +14,7 @@ from app.models.payment import Payment, PaymentType
 from app.models.client import Client
 from app.models.vendor import Vendor
 from app.models.user import User
+from app.models.settings import CompanySettings
 from app.core.security import get_current_user
 
 router = APIRouter()
@@ -968,3 +971,439 @@ async def get_upcoming_payments(
         }
         for inv in invoices
     ]
+
+
+@router.get("/party-ledger/{party_type}/{party_id}")
+async def get_party_ledger(
+    party_type: str,
+    party_id: int,
+    from_date: date = Query(...),
+    to_date: date = Query(...),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """
+    Get party ledger (customer/vendor statement) showing all transactions.
+
+    Args:
+        party_type: 'client' or 'vendor'
+        party_id: ID of the client or vendor
+        from_date: Start date for the statement
+        to_date: End date for the statement
+
+    Returns:
+        Party details, opening balance, transactions with running balance, and closing balance.
+    """
+    from app.models.payment import PaymentMode
+
+    # Validate party type
+    if party_type not in ['client', 'vendor']:
+        from fastapi import HTTPException
+        raise HTTPException(status_code=400, detail="party_type must be 'client' or 'vendor'")
+
+    # Fetch party details
+    if party_type == 'client':
+        party_result = await db.execute(select(Client).where(Client.id == party_id))
+        party = party_result.scalar_one_or_none()
+        if not party:
+            from fastapi import HTTPException
+            raise HTTPException(status_code=404, detail="Client not found")
+        party_info = {
+            "id": party.id,
+            "name": party.name,
+            "gstin": party.gstin,
+            "address": f"{party.address}, {party.city}, {party.state} - {party.pincode}",
+            "email": party.email,
+            "phone": party.phone,
+        }
+        invoice_type = InvoiceType.SALES
+        payment_type = PaymentType.RECEIPT
+    else:
+        party_result = await db.execute(select(Vendor).where(Vendor.id == party_id))
+        party = party_result.scalar_one_or_none()
+        if not party:
+            from fastapi import HTTPException
+            raise HTTPException(status_code=404, detail="Vendor not found")
+        party_info = {
+            "id": party.id,
+            "name": party.name,
+            "gstin": party.gstin,
+            "address": f"{party.address}, {party.city}, {party.state} - {party.pincode}",
+            "email": party.email,
+            "phone": party.phone,
+        }
+        invoice_type = InvoiceType.PURCHASE
+        payment_type = PaymentType.PAYMENT
+
+    # Calculate opening balance (sum of all transactions before from_date)
+    # For clients: Opening = (Invoices total - Payments received) before from_date
+    # For vendors: Opening = (Invoices total - Payments made) before from_date
+
+    # Get invoices before from_date
+    if party_type == 'client':
+        opening_invoices_result = await db.execute(
+            select(func.sum(Invoice.total_amount))
+            .where(Invoice.client_id == party_id)
+            .where(Invoice.invoice_type.in_([InvoiceType.SALES, InvoiceType.DEBIT_NOTE]))
+            .where(Invoice.invoice_date < from_date)
+            .where(Invoice.status != InvoiceStatus.CANCELLED)
+        )
+        opening_credit_notes_result = await db.execute(
+            select(func.sum(Invoice.total_amount))
+            .where(Invoice.client_id == party_id)
+            .where(Invoice.invoice_type == InvoiceType.CREDIT_NOTE)
+            .where(Invoice.invoice_date < from_date)
+            .where(Invoice.status != InvoiceStatus.CANCELLED)
+        )
+        opening_payments_result = await db.execute(
+            select(func.sum(Payment.net_amount))
+            .where(Payment.client_id == party_id)
+            .where(Payment.payment_type == PaymentType.RECEIPT)
+            .where(Payment.payment_date < from_date)
+        )
+    else:
+        opening_invoices_result = await db.execute(
+            select(func.sum(Invoice.total_amount))
+            .where(Invoice.vendor_id == party_id)
+            .where(Invoice.invoice_type.in_([InvoiceType.PURCHASE, InvoiceType.CREDIT_NOTE]))
+            .where(Invoice.invoice_date < from_date)
+            .where(Invoice.status != InvoiceStatus.CANCELLED)
+        )
+        opening_credit_notes_result = await db.execute(
+            select(func.sum(Invoice.total_amount))
+            .where(Invoice.vendor_id == party_id)
+            .where(Invoice.invoice_type == InvoiceType.DEBIT_NOTE)
+            .where(Invoice.invoice_date < from_date)
+            .where(Invoice.status != InvoiceStatus.CANCELLED)
+        )
+        opening_payments_result = await db.execute(
+            select(func.sum(Payment.net_amount))
+            .where(Payment.vendor_id == party_id)
+            .where(Payment.payment_type == PaymentType.PAYMENT)
+            .where(Payment.payment_date < from_date)
+        )
+
+    opening_invoices = float(opening_invoices_result.scalar() or 0)
+    opening_credit_notes = float(opening_credit_notes_result.scalar() or 0)
+    opening_payments = float(opening_payments_result.scalar() or 0)
+    opening_balance = opening_invoices - opening_credit_notes - opening_payments
+
+    # Get all transactions within the period
+    transactions = []
+
+    # Get invoices in period
+    if party_type == 'client':
+        invoices_result = await db.execute(
+            select(Invoice)
+            .where(Invoice.client_id == party_id)
+            .where(Invoice.invoice_date >= from_date)
+            .where(Invoice.invoice_date <= to_date)
+            .where(Invoice.status != InvoiceStatus.CANCELLED)
+            .order_by(Invoice.invoice_date, Invoice.id)
+        )
+    else:
+        invoices_result = await db.execute(
+            select(Invoice)
+            .where(Invoice.vendor_id == party_id)
+            .where(Invoice.invoice_date >= from_date)
+            .where(Invoice.invoice_date <= to_date)
+            .where(Invoice.status != InvoiceStatus.CANCELLED)
+            .order_by(Invoice.invoice_date, Invoice.id)
+        )
+
+    invoices = invoices_result.scalars().all()
+
+    for inv in invoices:
+        # Determine debit/credit based on invoice type and party type
+        if party_type == 'client':
+            # For client: Sales/Debit Note = Debit (they owe us), Credit Note = Credit (we owe them)
+            if inv.invoice_type in [InvoiceType.SALES, InvoiceType.DEBIT_NOTE]:
+                debit = float(inv.total_amount)
+                credit = 0
+                inv_type = "INVOICE" if inv.invoice_type == InvoiceType.SALES else "DEBIT_NOTE"
+                description = f"Sales Invoice" if inv.invoice_type == InvoiceType.SALES else "Debit Note"
+            else:
+                debit = 0
+                credit = float(inv.total_amount)
+                inv_type = "CREDIT_NOTE"
+                description = "Credit Note"
+        else:
+            # For vendor: Purchase/Credit Note = Credit (we owe them), Debit Note = Debit (they owe us)
+            if inv.invoice_type in [InvoiceType.PURCHASE, InvoiceType.CREDIT_NOTE]:
+                debit = 0
+                credit = float(inv.total_amount)
+                inv_type = "INVOICE" if inv.invoice_type == InvoiceType.PURCHASE else "CREDIT_NOTE"
+                description = f"Purchase Invoice" if inv.invoice_type == InvoiceType.PURCHASE else "Credit Note"
+            else:
+                debit = float(inv.total_amount)
+                credit = 0
+                inv_type = "DEBIT_NOTE"
+                description = "Debit Note"
+
+        transactions.append({
+            "date": str(inv.invoice_date),
+            "voucher_number": inv.invoice_number,
+            "type": inv_type,
+            "description": description,
+            "debit": debit,
+            "credit": credit,
+            "reference_id": inv.id,
+            "sort_key": (inv.invoice_date, 0, inv.id),  # For sorting: invoices before payments on same day
+        })
+
+    # Get payments in period
+    if party_type == 'client':
+        payments_result = await db.execute(
+            select(Payment)
+            .where(Payment.client_id == party_id)
+            .where(Payment.payment_type == PaymentType.RECEIPT)
+            .where(Payment.payment_date >= from_date)
+            .where(Payment.payment_date <= to_date)
+        )
+    else:
+        payments_result = await db.execute(
+            select(Payment)
+            .where(Payment.vendor_id == party_id)
+            .where(Payment.payment_type == PaymentType.PAYMENT)
+            .where(Payment.payment_date >= from_date)
+            .where(Payment.payment_date <= to_date)
+        )
+
+    payments = payments_result.scalars().all()
+
+    for pmt in payments:
+        # For client: Payment received = Credit (they paid us)
+        # For vendor: Payment made = Debit (we paid them)
+        if party_type == 'client':
+            debit = 0
+            credit = float(pmt.net_amount)
+        else:
+            debit = float(pmt.net_amount)
+            credit = 0
+
+        # Get payment mode description
+        mode_str = pmt.payment_mode.value if pmt.payment_mode else "N/A"
+        description = f"Payment via {mode_str}"
+        if pmt.reference_number:
+            description += f" (Ref: {pmt.reference_number})"
+
+        transactions.append({
+            "date": str(pmt.payment_date),
+            "voucher_number": pmt.payment_number,
+            "type": "PAYMENT",
+            "description": description,
+            "debit": debit,
+            "credit": credit,
+            "reference_id": pmt.id,
+            "sort_key": (pmt.payment_date, 1, pmt.id),  # Payments after invoices on same day
+        })
+
+    # Sort transactions by date, then type (invoices before payments), then id
+    transactions.sort(key=lambda x: x["sort_key"])
+
+    # Calculate running balance
+    running_balance = opening_balance
+    total_debit = 0
+    total_credit = 0
+
+    for txn in transactions:
+        running_balance = running_balance + txn["debit"] - txn["credit"]
+        txn["balance"] = round(running_balance, 2)
+        total_debit += txn["debit"]
+        total_credit += txn["credit"]
+        # Remove the sort_key from output
+        del txn["sort_key"]
+
+    closing_balance = opening_balance + total_debit - total_credit
+
+    return {
+        "party": party_info,
+        "party_type": party_type,
+        "period": {"from": str(from_date), "to": str(to_date)},
+        "opening_balance": round(opening_balance, 2),
+        "transactions": transactions,
+        "total_debit": round(total_debit, 2),
+        "total_credit": round(total_credit, 2),
+        "closing_balance": round(closing_balance, 2),
+    }
+
+
+@router.get("/party-ledger/{party_type}/{party_id}/pdf")
+async def get_party_ledger_pdf(
+    party_type: str,
+    party_id: int,
+    from_date: date = Query(...),
+    to_date: date = Query(...),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """
+    Generate PDF for party ledger (customer/vendor statement).
+    """
+    from reportlab.lib import colors
+    from reportlab.lib.pagesizes import A4
+    from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+    from reportlab.lib.units import inch, mm
+    from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
+
+    # Get ledger data using the same logic
+    ledger_data = await get_party_ledger(party_type, party_id, from_date, to_date, db, current_user)
+
+    # Get company settings
+    settings_result = await db.execute(select(CompanySettings).where(CompanySettings.is_active == True))
+    company = settings_result.scalar_one_or_none()
+
+    # Create PDF buffer
+    buffer = io.BytesIO()
+    doc = SimpleDocTemplate(buffer, pagesize=A4, rightMargin=20*mm, leftMargin=20*mm, topMargin=20*mm, bottomMargin=20*mm)
+
+    # Styles
+    styles = getSampleStyleSheet()
+    title_style = ParagraphStyle(
+        'CustomTitle',
+        parent=styles['Heading1'],
+        fontSize=16,
+        spaceAfter=6,
+        alignment=1,  # Center
+    )
+    header_style = ParagraphStyle(
+        'CustomHeader',
+        parent=styles['Normal'],
+        fontSize=10,
+        alignment=1,  # Center
+    )
+    normal_style = ParagraphStyle(
+        'CustomNormal',
+        parent=styles['Normal'],
+        fontSize=9,
+    )
+    bold_style = ParagraphStyle(
+        'CustomBold',
+        parent=styles['Normal'],
+        fontSize=9,
+        fontName='Helvetica-Bold',
+    )
+
+    elements = []
+
+    # Company Header
+    if company:
+        elements.append(Paragraph(company.company_name, title_style))
+        elements.append(Paragraph(f"{company.address}, {company.city}, {company.state} - {company.pincode}", header_style))
+        if company.gstin:
+            elements.append(Paragraph(f"GSTIN: {company.gstin} | PAN: {company.pan}", header_style))
+        elements.append(Spacer(1, 10*mm))
+
+    # Report Title
+    party_label = "Customer" if party_type == "client" else "Vendor"
+    elements.append(Paragraph(f"<b>{party_label} Ledger Statement</b>", title_style))
+    elements.append(Spacer(1, 5*mm))
+
+    # Party Details
+    party = ledger_data["party"]
+    party_info_data = [
+        ["Party Name:", party["name"], "Period:", f"{from_date.strftime('%d-%b-%Y')} to {to_date.strftime('%d-%b-%Y')}"],
+        ["GSTIN:", party.get("gstin") or "N/A", "Phone:", party.get("phone") or "N/A"],
+        ["Address:", party.get("address") or "N/A", "Email:", party.get("email") or "N/A"],
+    ]
+    party_table = Table(party_info_data, colWidths=[60, 170, 50, 140])
+    party_table.setStyle(TableStyle([
+        ('FONTNAME', (0, 0), (0, -1), 'Helvetica-Bold'),
+        ('FONTNAME', (2, 0), (2, -1), 'Helvetica-Bold'),
+        ('FONTSIZE', (0, 0), (-1, -1), 9),
+        ('VALIGN', (0, 0), (-1, -1), 'TOP'),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 4),
+    ]))
+    elements.append(party_table)
+    elements.append(Spacer(1, 8*mm))
+
+    # Opening Balance
+    opening_bal = ledger_data["opening_balance"]
+    opening_text = f"Opening Balance (as on {from_date.strftime('%d-%b-%Y')}): "
+    if opening_bal >= 0:
+        opening_text += f"Rs. {abs(opening_bal):,.2f} Dr" if opening_bal > 0 else "Rs. 0.00"
+    else:
+        opening_text += f"Rs. {abs(opening_bal):,.2f} Cr"
+    elements.append(Paragraph(f"<b>{opening_text}</b>", normal_style))
+    elements.append(Spacer(1, 3*mm))
+
+    # Transaction Table
+    table_data = [["Date", "Voucher No.", "Type", "Description", "Debit (Rs.)", "Credit (Rs.)", "Balance (Rs.)"]]
+
+    for txn in ledger_data["transactions"]:
+        balance = txn["balance"]
+        balance_str = f"{abs(balance):,.2f} {'Dr' if balance >= 0 else 'Cr'}"
+        table_data.append([
+            txn["date"],
+            txn["voucher_number"],
+            txn["type"],
+            txn["description"][:30],  # Truncate long descriptions
+            f"{txn['debit']:,.2f}" if txn['debit'] > 0 else "",
+            f"{txn['credit']:,.2f}" if txn['credit'] > 0 else "",
+            balance_str,
+        ])
+
+    # Add totals row
+    closing = ledger_data["closing_balance"]
+    closing_str = f"{abs(closing):,.2f} {'Dr' if closing >= 0 else 'Cr'}"
+    table_data.append([
+        "", "", "", "Total:",
+        f"{ledger_data['total_debit']:,.2f}",
+        f"{ledger_data['total_credit']:,.2f}",
+        closing_str,
+    ])
+
+    col_widths = [55, 70, 55, 100, 65, 65, 70]
+    txn_table = Table(table_data, colWidths=col_widths, repeatRows=1)
+    txn_table.setStyle(TableStyle([
+        # Header row
+        ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#4472C4')),
+        ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+        ('FONTSIZE', (0, 0), (-1, 0), 9),
+        ('ALIGN', (0, 0), (-1, 0), 'CENTER'),
+        # Data rows
+        ('FONTSIZE', (0, 1), (-1, -1), 8),
+        ('ALIGN', (4, 1), (-1, -1), 'RIGHT'),  # Right align numbers
+        ('ALIGN', (0, 1), (0, -1), 'CENTER'),  # Center date
+        # Totals row
+        ('BACKGROUND', (0, -1), (-1, -1), colors.HexColor('#D9E2F3')),
+        ('FONTNAME', (0, -1), (-1, -1), 'Helvetica-Bold'),
+        # Grid
+        ('GRID', (0, 0), (-1, -1), 0.5, colors.grey),
+        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+        ('TOPPADDING', (0, 0), (-1, -1), 3),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 3),
+        # Alternate row colors
+        ('ROWBACKGROUNDS', (0, 1), (-1, -2), [colors.white, colors.HexColor('#F2F2F2')]),
+    ]))
+    elements.append(txn_table)
+    elements.append(Spacer(1, 8*mm))
+
+    # Closing Balance Summary
+    closing_bal = ledger_data["closing_balance"]
+    closing_text = f"Closing Balance (as on {to_date.strftime('%d-%b-%Y')}): "
+    if closing_bal >= 0:
+        closing_text += f"Rs. {abs(closing_bal):,.2f} Dr" if closing_bal > 0 else "Rs. 0.00"
+    else:
+        closing_text += f"Rs. {abs(closing_bal):,.2f} Cr"
+    elements.append(Paragraph(f"<b>{closing_text}</b>", normal_style))
+    elements.append(Spacer(1, 15*mm))
+
+    # Footer
+    elements.append(Paragraph(f"Generated on: {datetime.now().strftime('%d-%b-%Y %H:%M')}", normal_style))
+    elements.append(Paragraph("This is a computer-generated statement and does not require a signature.", normal_style))
+
+    # Build PDF
+    doc.build(elements)
+    buffer.seek(0)
+
+    # Generate filename
+    party_name_safe = party["name"].replace(" ", "_").replace("/", "_")[:30]
+    filename = f"Ledger_{party_name_safe}_{from_date}_{to_date}.pdf"
+
+    return StreamingResponse(
+        buffer,
+        media_type="application/pdf",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'}
+    )

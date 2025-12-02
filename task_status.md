@@ -1,3 +1,4 @@
+
 # Hisaab Application - Task Status
 
 ## Summary
@@ -15,10 +16,21 @@ All identified issues from the comprehensive application review have been addres
 | 4 | Fix Payment View button handler | Completed | `frontend/src/pages/payments/Payments.tsx` |
 | 5 | Remove console statements from frontend | Completed | 15+ frontend files cleaned |
 | 6 | Fix hardcoded Dashboard data | Completed | `backend/app/api/v1/endpoints/reports.py`, `frontend/src/pages/dashboard/Dashboard.tsx` |
-| 7 | Add P&L Statement report | Completed | `backend/app/api/v1/endpoints/reports.py`, `frontend/src/pages/reports/Reports.tsx` - Fixed field names (`name` → `account_name`, `code` → `account_code`) |
-| 8 | Add Balance Sheet report | Completed | `backend/app/api/v1/endpoints/reports.py`, `frontend/src/pages/reports/Reports.tsx` - Fixed field names (`name` → `account_name`, `code` → `account_code`) |
+| 7 | Add P&L Statement report | Completed | `backend/app/api/v1/endpoints/reports.py`, `frontend/src/pages/reports/Reports.tsx` |
+| 8 | Add Balance Sheet report | Completed | `backend/app/api/v1/endpoints/reports.py`, `frontend/src/pages/reports/Reports.tsx` |
 | 9 | Implement CSV/Excel export | Completed | `frontend/src/lib/export.ts`, `frontend/src/pages/reports/GSTReports.tsx`, `frontend/src/pages/invoices/Invoices.tsx`, `frontend/src/pages/payments/Payments.tsx`, `frontend/src/pages/ledger/Ledger.tsx` |
 | 10 | Fix TypeScript type warnings | Completed | Multiple frontend files |
+
+---
+
+## Bug Fixes (Session 2 - December 2, 2025)
+
+| # | Bug | Root Cause | Fix Applied |
+|---|-----|------------|-------------|
+| 1 | Invoice Subtotal showing NaN | Field name mismatch: `sub_total` vs `subtotal` | Changed `invoice.sub_total` to `invoice.subtotal` in `InvoiceView.tsx` |
+| 2 | P&L Report 500 Error | Wrong field names: `account_name`, `account_code` don't exist | Used `.label()` aliases: `ChartOfAccount.name.label('account_name')`, `ChartOfAccount.code.label('account_code')` |
+| 3 | Balance Sheet 500 Error (field names) | Same as P&L - wrong field names | Applied same `.label()` fix to all queries |
+| 4 | Balance Sheet 500 Error (case function) | `func.case()` is invalid, should use `case()` directly | Added `case` to imports, changed `func.case()` to `case()` |
 
 ---
 

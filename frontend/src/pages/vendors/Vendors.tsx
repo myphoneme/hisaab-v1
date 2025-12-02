@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Plus, Edit, Trash2, Search } from 'lucide-react';
+import { Plus, Edit, Trash2, Search, BookOpen } from 'lucide-react';
 import { toast } from 'sonner';
 import { vendorApi } from '../../services/api';
 import type { Vendor, VendorCreate } from '../../types';
@@ -8,11 +8,13 @@ import { Card, CardContent, CardHeader } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
 import { VendorForm } from './VendorForm';
+import { PartyLedger } from '../clients/PartyLedger';
 
 export function Vendors() {
   const [searchTerm, setSearchTerm] = useState('');
   const [showForm, setShowForm] = useState(false);
   const [editingVendor, setEditingVendor] = useState<Vendor | null>(null);
+  const [ledgerVendor, setLedgerVendor] = useState<Vendor | null>(null);
   const queryClient = useQueryClient();
 
   const { data: vendors, isLoading } = useQuery<Vendor[]>({
@@ -165,10 +167,25 @@ export function Vendors() {
                         </span>
                       </td>
                       <td className="px-4 py-3 text-right text-sm">
-                        <button onClick={() => handleEdit(vendor)} className="text-blue-600 hover:text-blue-900 mr-3">
+                        <button
+                          onClick={() => setLedgerVendor(vendor)}
+                          className="text-green-600 hover:text-green-900 mr-3"
+                          title="View Ledger"
+                        >
+                          <BookOpen className="h-4 w-4" />
+                        </button>
+                        <button
+                          onClick={() => handleEdit(vendor)}
+                          className="text-blue-600 hover:text-blue-900 mr-3"
+                          title="Edit"
+                        >
                           <Edit className="h-4 w-4" />
                         </button>
-                        <button onClick={() => handleDelete(vendor.id)} className="text-red-600 hover:text-red-900">
+                        <button
+                          onClick={() => handleDelete(vendor.id)}
+                          className="text-red-600 hover:text-red-900"
+                          title="Delete"
+                        >
                           <Trash2 className="h-4 w-4" />
                         </button>
                       </td>
@@ -196,6 +213,15 @@ export function Vendors() {
             setEditingVendor(null);
           }}
           isLoading={createMutation.isPending || updateMutation.isPending}
+        />
+      )}
+
+      {ledgerVendor && (
+        <PartyLedger
+          partyType="vendor"
+          partyId={ledgerVendor.id}
+          partyName={ledgerVendor.name}
+          onClose={() => setLedgerVendor(null)}
         />
       )}
     </div>

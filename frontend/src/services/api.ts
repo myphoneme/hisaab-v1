@@ -191,6 +191,36 @@ export interface TDSSummaryResponse {
   total_tds: number;
 }
 
+// Party Ledger Response type
+export interface PartyLedgerTransaction {
+  date: string;
+  voucher_number: string;
+  type: 'INVOICE' | 'PAYMENT' | 'CREDIT_NOTE' | 'DEBIT_NOTE';
+  description: string;
+  debit: number;
+  credit: number;
+  balance: number;
+  reference_id: number;
+}
+
+export interface PartyLedgerResponse {
+  party: {
+    id: number;
+    name: string;
+    gstin?: string;
+    address: string;
+    email?: string;
+    phone?: string;
+  };
+  party_type: 'client' | 'vendor';
+  period: { from: string; to: string };
+  opening_balance: number;
+  transactions: PartyLedgerTransaction[];
+  total_debit: number;
+  total_credit: number;
+  closing_balance: number;
+}
+
 // Reports API
 export const reportsApi = {
   getDashboard: (params?: Record<string, unknown>) => api.get<DashboardStats>('/reports/dashboard', params),
@@ -203,6 +233,19 @@ export const reportsApi = {
   getUpcomingPayments: (params?: Record<string, unknown>) => api.get<unknown>('/reports/upcoming-payments', params),
   getProfitLoss: (params?: Record<string, unknown>) => api.get<unknown>('/reports/profit-loss', params),
   getBalanceSheet: (params?: Record<string, unknown>) => api.get<unknown>('/reports/balance-sheet', params),
+  getPartyLedger: (partyType: 'client' | 'vendor', partyId: number, params?: Record<string, unknown>) =>
+    api.get<PartyLedgerResponse>(`/reports/party-ledger/${partyType}/${partyId}`, params),
+  downloadPartyLedgerPDF: async (partyType: 'client' | 'vendor', partyId: number, params?: Record<string, unknown>) => {
+    const token = localStorage.getItem('access_token');
+    const queryString = params ? '?' + new URLSearchParams(params as Record<string, string>).toString() : '';
+    const response = await fetch(`/api/v1/reports/party-ledger/${partyType}/${partyId}/pdf${queryString}`, {
+      headers: {
+        'Authorization': `Bearer ${token}`,
+      },
+    });
+    if (!response.ok) throw new Error('Failed to download PDF');
+    return response.blob();
+  },
 };
 
 // Settings API
