@@ -1,3 +1,4 @@
+import logging
 from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, status, Query, Body
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -5,6 +6,8 @@ from sqlalchemy import select, func
 from sqlalchemy.orm import selectinload
 from datetime import date, timedelta
 from decimal import Decimal
+
+logger = logging.getLogger(__name__)
 
 from app.db.session import get_db
 from app.models.invoice import Invoice, InvoiceItem, InvoiceType, InvoiceStatus
@@ -264,8 +267,7 @@ async def create_invoice(
                 await post_invoice(db, invoice, settings)
                 await db.commit()
             except Exception as e:
-                # Log error but don't fail the invoice creation
-                pass
+                logger.error(f"Failed to post ledger for invoice {invoice.invoice_number}: {str(e)}")
 
     # Reload with relationships
     result = await db.execute(
@@ -419,8 +421,7 @@ async def update_invoice_status(
             try:
                 await post_invoice(db, invoice, settings)
             except Exception as e:
-                # Log error but continue with status update
-                pass
+                logger.error(f"Failed to post ledger for invoice {invoice.invoice_number} on send: {str(e)}")
 
     # Reverse ledger posting when cancelled
     if status_update == InvoiceStatus.CANCELLED and invoice.is_posted:
@@ -428,8 +429,7 @@ async def update_invoice_status(
             try:
                 await reverse_invoice_posting(db, invoice, settings)
             except Exception as e:
-                # Log error but continue with status update
-                pass
+                logger.error(f"Failed to reverse ledger for invoice {invoice.invoice_number}: {str(e)}")
 
     await db.commit()
     await db.refresh(invoice)

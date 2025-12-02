@@ -1,8 +1,9 @@
-from typing import Optional
+from typing import Optional, List
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func
-from datetime import date, datetime
+from sqlalchemy.orm import selectinload
+from datetime import date, datetime, timedelta
 from decimal import Decimal
 
 from app.db.session import get_db
@@ -636,3 +637,334 @@ async def get_gstr3b_report(
             "cess": float((sales.cess or 0) - (purchases.cess or 0)),
         },
     }
+
+
+@router.get("/profit-loss")
+async def get_profit_loss(
+    from_date: date = Query(...),
+    to_date: date = Query(...),
+    branch_id: Optional[int] = None,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Get Profit & Loss statement for a period."""
+    from app.models.ledger import LedgerEntry, ChartOfAccount
+
+    # Build base query with date filter
+    base_where = [
+        LedgerEntry.entry_date >= from_date,
+        LedgerEntry.entry_date <= to_date,
+    ]
+    if branch_id:
+        base_where.append(LedgerEntry.branch_id == branch_id)
+
+    # Revenue (Credit balance in REVENUE accounts)
+    revenue_result = await db.execute(
+        select(
+            ChartOfAccount.account_name,
+            ChartOfAccount.account_code,
+            func.sum(LedgerEntry.credit - LedgerEntry.debit).label('amount')
+        )
+        .join(ChartOfAccount, LedgerEntry.account_id == ChartOfAccount.id)
+        .where(ChartOfAccount.account_type == 'REVENUE')
+        .where(*base_where)
+        .group_by(ChartOfAccount.id, ChartOfAccount.account_name, ChartOfAccount.account_code)
+        .having(func.sum(LedgerEntry.credit - LedgerEntry.debit) != 0)
+    )
+    revenue_items = revenue_result.all()
+    total_revenue = sum(float(r.amount or 0) for r in revenue_items)
+
+    # Cost of Goods Sold (Debit balance in EXPENSE accounts with group 'COGS' or 'Cost of Goods Sold')
+    cogs_result = await db.execute(
+        select(
+            ChartOfAccount.account_name,
+            ChartOfAccount.account_code,
+            func.sum(LedgerEntry.debit - LedgerEntry.credit).label('amount')
+        )
+        .join(ChartOfAccount, LedgerEntry.account_id == ChartOfAccount.id)
+        .where(ChartOfAccount.account_type == 'EXPENSE')
+        .where(ChartOfAccount.account_group.in_(['COGS', 'Cost of Goods Sold', 'Purchase']))
+        .where(*base_where)
+        .group_by(ChartOfAccount.id, ChartOfAccount.account_name, ChartOfAccount.account_code)
+        .having(func.sum(LedgerEntry.debit - LedgerEntry.credit) != 0)
+    )
+    cogs_items = cogs_result.all()
+    total_cogs = sum(float(r.amount or 0) for r in cogs_items)
+
+    # Operating Expenses (Debit balance in EXPENSE accounts excluding COGS)
+    expenses_result = await db.execute(
+        select(
+            ChartOfAccount.account_name,
+            ChartOfAccount.account_code,
+            func.sum(LedgerEntry.debit - LedgerEntry.credit).label('amount')
+        )
+        .join(ChartOfAccount, LedgerEntry.account_id == ChartOfAccount.id)
+        .where(ChartOfAccount.account_type == 'EXPENSE')
+        .where(~ChartOfAccount.account_group.in_(['COGS', 'Cost of Goods Sold', 'Purchase']))
+        .where(*base_where)
+        .group_by(ChartOfAccount.id, ChartOfAccount.account_name, ChartOfAccount.account_code)
+        .having(func.sum(LedgerEntry.debit - LedgerEntry.credit) != 0)
+    )
+    expense_items = expenses_result.all()
+    total_expenses = sum(float(r.amount or 0) for r in expense_items)
+
+    # Calculate summary
+    gross_profit = total_revenue - total_cogs
+    operating_profit = gross_profit - total_expenses
+    net_profit = operating_profit  # Add other income/expenses if needed
+
+    return {
+        "period": f"{from_date} to {to_date}",
+        "branch_id": branch_id,
+        "revenue": {
+            "items": [
+                {"account_code": r.account_code, "account_name": r.account_name, "amount": float(r.amount or 0)}
+                for r in revenue_items
+            ],
+            "total": total_revenue,
+        },
+        "cost_of_goods_sold": {
+            "items": [
+                {"account_code": r.account_code, "account_name": r.account_name, "amount": float(r.amount or 0)}
+                for r in cogs_items
+            ],
+            "total": total_cogs,
+        },
+        "gross_profit": gross_profit,
+        "operating_expenses": {
+            "items": [
+                {"account_code": r.account_code, "account_name": r.account_name, "amount": float(r.amount or 0)}
+                for r in expense_items
+            ],
+            "total": total_expenses,
+        },
+        "operating_profit": operating_profit,
+        "net_profit": net_profit,
+    }
+
+
+@router.get("/balance-sheet")
+async def get_balance_sheet(
+    as_on_date: date = Query(...),
+    branch_id: Optional[int] = None,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Get Balance Sheet as on a specific date."""
+    from app.models.ledger import LedgerEntry, ChartOfAccount
+
+    # Build base query with date filter (all entries up to as_on_date)
+    base_where = [LedgerEntry.entry_date <= as_on_date]
+    if branch_id:
+        base_where.append(LedgerEntry.branch_id == branch_id)
+
+    # Assets (Debit balance)
+    assets_result = await db.execute(
+        select(
+            ChartOfAccount.account_name,
+            ChartOfAccount.account_code,
+            ChartOfAccount.account_group,
+            func.sum(LedgerEntry.debit - LedgerEntry.credit).label('amount')
+        )
+        .join(ChartOfAccount, LedgerEntry.account_id == ChartOfAccount.id)
+        .where(ChartOfAccount.account_type == 'ASSET')
+        .where(*base_where)
+        .group_by(ChartOfAccount.id, ChartOfAccount.account_name, ChartOfAccount.account_code, ChartOfAccount.account_group)
+        .having(func.sum(LedgerEntry.debit - LedgerEntry.credit) != 0)
+    )
+    asset_items = assets_result.all()
+
+    # Group assets by category
+    current_assets = [a for a in asset_items if a.account_group in ['Current Assets', 'Bank', 'Cash', 'Receivables', 'Inventory']]
+    fixed_assets = [a for a in asset_items if a.account_group in ['Fixed Assets', 'Property', 'Equipment']]
+    other_assets = [a for a in asset_items if a not in current_assets and a not in fixed_assets]
+
+    total_current_assets = sum(float(a.amount or 0) for a in current_assets)
+    total_fixed_assets = sum(float(a.amount or 0) for a in fixed_assets)
+    total_other_assets = sum(float(a.amount or 0) for a in other_assets)
+    total_assets = total_current_assets + total_fixed_assets + total_other_assets
+
+    # Liabilities (Credit balance)
+    liabilities_result = await db.execute(
+        select(
+            ChartOfAccount.account_name,
+            ChartOfAccount.account_code,
+            ChartOfAccount.account_group,
+            func.sum(LedgerEntry.credit - LedgerEntry.debit).label('amount')
+        )
+        .join(ChartOfAccount, LedgerEntry.account_id == ChartOfAccount.id)
+        .where(ChartOfAccount.account_type == 'LIABILITY')
+        .where(*base_where)
+        .group_by(ChartOfAccount.id, ChartOfAccount.account_name, ChartOfAccount.account_code, ChartOfAccount.account_group)
+        .having(func.sum(LedgerEntry.credit - LedgerEntry.debit) != 0)
+    )
+    liability_items = liabilities_result.all()
+
+    # Group liabilities
+    current_liabilities = [l for l in liability_items if l.account_group in ['Current Liabilities', 'Payables', 'Short Term Loans']]
+    long_term_liabilities = [l for l in liability_items if l.account_group in ['Long Term Liabilities', 'Loans']]
+    other_liabilities = [l for l in liability_items if l not in current_liabilities and l not in long_term_liabilities]
+
+    total_current_liabilities = sum(float(l.amount or 0) for l in current_liabilities)
+    total_long_term_liabilities = sum(float(l.amount or 0) for l in long_term_liabilities)
+    total_other_liabilities = sum(float(l.amount or 0) for l in other_liabilities)
+    total_liabilities = total_current_liabilities + total_long_term_liabilities + total_other_liabilities
+
+    # Equity (Credit balance)
+    equity_result = await db.execute(
+        select(
+            ChartOfAccount.account_name,
+            ChartOfAccount.account_code,
+            func.sum(LedgerEntry.credit - LedgerEntry.debit).label('amount')
+        )
+        .join(ChartOfAccount, LedgerEntry.account_id == ChartOfAccount.id)
+        .where(ChartOfAccount.account_type == 'EQUITY')
+        .where(*base_where)
+        .group_by(ChartOfAccount.id, ChartOfAccount.account_name, ChartOfAccount.account_code)
+        .having(func.sum(LedgerEntry.credit - LedgerEntry.debit) != 0)
+    )
+    equity_items = equity_result.all()
+    total_equity = sum(float(e.amount or 0) for e in equity_items)
+
+    # Calculate retained earnings (Revenue - Expenses for all time)
+    retained_earnings_result = await db.execute(
+        select(
+            func.sum(
+                func.case(
+                    (ChartOfAccount.account_type == 'REVENUE', LedgerEntry.credit - LedgerEntry.debit),
+                    else_=-(LedgerEntry.debit - LedgerEntry.credit)
+                )
+            )
+        )
+        .join(ChartOfAccount, LedgerEntry.account_id == ChartOfAccount.id)
+        .where(ChartOfAccount.account_type.in_(['REVENUE', 'EXPENSE']))
+        .where(*base_where)
+    )
+    retained_earnings = float(retained_earnings_result.scalar() or 0)
+
+    total_equity_with_retained = total_equity + retained_earnings
+
+    return {
+        "as_on_date": str(as_on_date),
+        "branch_id": branch_id,
+        "assets": {
+            "current_assets": {
+                "items": [{"account_code": a.account_code, "account_name": a.account_name, "amount": float(a.amount or 0)} for a in current_assets],
+                "total": total_current_assets,
+            },
+            "fixed_assets": {
+                "items": [{"account_code": a.account_code, "account_name": a.account_name, "amount": float(a.amount or 0)} for a in fixed_assets],
+                "total": total_fixed_assets,
+            },
+            "other_assets": {
+                "items": [{"account_code": a.account_code, "account_name": a.account_name, "amount": float(a.amount or 0)} for a in other_assets],
+                "total": total_other_assets,
+            },
+            "total": total_assets,
+        },
+        "liabilities": {
+            "current_liabilities": {
+                "items": [{"account_code": l.account_code, "account_name": l.account_name, "amount": float(l.amount or 0)} for l in current_liabilities],
+                "total": total_current_liabilities,
+            },
+            "long_term_liabilities": {
+                "items": [{"account_code": l.account_code, "account_name": l.account_name, "amount": float(l.amount or 0)} for l in long_term_liabilities],
+                "total": total_long_term_liabilities,
+            },
+            "other_liabilities": {
+                "items": [{"account_code": l.account_code, "account_name": l.account_name, "amount": float(l.amount or 0)} for l in other_liabilities],
+                "total": total_other_liabilities,
+            },
+            "total": total_liabilities,
+        },
+        "equity": {
+            "items": [{"account_code": e.account_code, "account_name": e.account_name, "amount": float(e.amount or 0)} for e in equity_items],
+            "retained_earnings": retained_earnings,
+            "total": total_equity_with_retained,
+        },
+        "total_liabilities_and_equity": total_liabilities + total_equity_with_retained,
+        "balanced": abs(total_assets - (total_liabilities + total_equity_with_retained)) < 0.01,
+    }
+
+
+@router.get("/recent-invoices")
+async def get_recent_invoices(
+    limit: int = Query(5, ge=1, le=20),
+    branch_id: Optional[int] = None,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Get recent invoices for dashboard."""
+    query = (
+        select(Invoice)
+        .options(selectinload(Invoice.client))
+        .where(Invoice.invoice_type == InvoiceType.SALES)
+        .where(Invoice.status != InvoiceStatus.CANCELLED)
+        .order_by(Invoice.invoice_date.desc(), Invoice.created_at.desc())
+        .limit(limit)
+    )
+
+    if branch_id:
+        query = query.where(Invoice.branch_id == branch_id)
+
+    result = await db.execute(query)
+    invoices = result.scalars().all()
+
+    return [
+        {
+            "id": inv.id,
+            "invoice_number": inv.invoice_number,
+            "invoice_date": str(inv.invoice_date),
+            "client_name": inv.client.name if inv.client else "N/A",
+            "total_amount": float(inv.total_amount),
+            "amount_due": float(inv.amount_due),
+            "due_date": str(inv.due_date) if inv.due_date else None,
+            "status": inv.status.value,
+        }
+        for inv in invoices
+    ]
+
+
+@router.get("/upcoming-payments")
+async def get_upcoming_payments(
+    limit: int = Query(5, ge=1, le=20),
+    days_ahead: int = Query(30, ge=1, le=90),
+    branch_id: Optional[int] = None,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Get upcoming payments due (purchase invoices with outstanding amount)."""
+    today = datetime.now().date()
+    future_date = today + timedelta(days=days_ahead)
+
+    query = (
+        select(Invoice)
+        .options(selectinload(Invoice.vendor))
+        .where(Invoice.invoice_type == InvoiceType.PURCHASE)
+        .where(Invoice.amount_due > 0)
+        .where(Invoice.status.not_in([InvoiceStatus.PAID, InvoiceStatus.CANCELLED]))
+        .where(Invoice.due_date <= future_date)
+        .order_by(Invoice.due_date.asc())
+        .limit(limit)
+    )
+
+    if branch_id:
+        query = query.where(Invoice.branch_id == branch_id)
+
+    result = await db.execute(query)
+    invoices = result.scalars().all()
+
+    return [
+        {
+            "id": inv.id,
+            "invoice_number": inv.invoice_number,
+            "invoice_date": str(inv.invoice_date),
+            "vendor_name": inv.vendor.name if inv.vendor else "N/A",
+            "total_amount": float(inv.total_amount),
+            "amount_due": float(inv.amount_due),
+            "due_date": str(inv.due_date) if inv.due_date else None,
+            "days_until_due": (inv.due_date - today).days if inv.due_date else None,
+            "status": inv.status.value,
+        }
+        for inv in invoices
+    ]

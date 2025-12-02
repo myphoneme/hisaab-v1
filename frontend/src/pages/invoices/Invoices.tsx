@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Plus, Eye, Trash2, Search, FileText, Edit, Send } from 'lucide-react';
+import { Plus, Eye, Trash2, Search, FileText, Edit, Send, Download } from 'lucide-react';
 import { toast } from 'sonner';
 import { invoiceApi } from '../../services/api';
 import type { Invoice } from '../../types';
@@ -11,6 +11,7 @@ import { Input } from '../../components/ui/Input';
 import { Badge } from '../../components/ui/Badge';
 import { BranchSelector } from '../../components/ui/BranchSelector';
 import { formatCurrency } from '../../lib/utils';
+import { exportToCSV, invoiceExportColumns } from '../../lib/export';
 
 export function Invoices() {
   const navigate = useNavigate();
@@ -22,7 +23,7 @@ export function Invoices() {
   const { data: invoices, isLoading } = useQuery<Invoice[]>({
     queryKey: ['invoices', branchId, statusFilter],
     queryFn: async () => {
-      const params: any = {};
+      const params: Record<string, unknown> = {};
       if (branchId) params.branch_id = branchId;
       if (statusFilter) params.status_filter = statusFilter;
       const response = await invoiceApi.getAll(params);
@@ -30,6 +31,30 @@ export function Invoices() {
       return response?.items || [];
     },
   });
+
+  const handleExport = () => {
+    if (!filteredInvoices || filteredInvoices.length === 0) {
+      toast.error('No data to export');
+      return;
+    }
+    // Transform data for export
+    const exportData = filteredInvoices.map(inv => ({
+      invoice_number: inv.invoice_number,
+      invoice_date: inv.invoice_date,
+      client_name: inv.client?.name || inv.vendor?.name || '',
+      po_number: inv.po_number || '',
+      subtotal: inv.subtotal,
+      cgst_amount: inv.cgst_amount,
+      sgst_amount: inv.sgst_amount,
+      igst_amount: inv.igst_amount,
+      tds_amount: inv.tds_amount,
+      total_amount: inv.total_amount,
+      amount_due: inv.amount_due,
+      status: inv.status,
+    }));
+    exportToCSV(exportData, invoiceExportColumns, `Invoices_${new Date().toISOString().split('T')[0]}`);
+    toast.success('Export completed');
+  };
 
   const deleteMutation = useMutation({
     mutationFn: (id: number) => invoiceApi.delete(id),
@@ -45,7 +70,7 @@ export function Invoices() {
       queryClient.invalidateQueries({ queryKey: ['invoices'] });
       toast.success('Invoice sent and posted to ledger');
     },
-    onError: (error: any) => {
+    onError: (error: Error & { response?: { data?: { detail?: string | Array<{ msg?: string }> } } }) => {
       const detail = error.response?.data?.detail;
       let msg = 'Failed to send invoice';
       if (typeof detail === 'string') {
@@ -88,10 +113,16 @@ export function Invoices() {
           <h1 className="text-2xl font-bold text-gray-900">Invoices</h1>
           <p className="text-gray-500 mt-1">Manage sales and purchase invoices</p>
         </div>
-        <Button onClick={() => navigate('/invoices/new')}>
-          <Plus className="h-4 w-4 mr-2" />
-          Create Invoice
-        </Button>
+        <div className="flex gap-2">
+          <Button variant="outline" onClick={handleExport}>
+            <Download className="h-4 w-4 mr-2" />
+            Export CSV
+          </Button>
+          <Button onClick={() => navigate('/invoices/new')}>
+            <Plus className="h-4 w-4 mr-2" />
+            Create Invoice
+          </Button>
+        </div>
       </div>
 
       <Card>

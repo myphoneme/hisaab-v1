@@ -131,7 +131,6 @@ export function PaymentForm({ payment, onSubmit, onClose, isLoading }: PaymentFo
       cheque_date: data.cheque_date || undefined,
       notes: data.notes?.trim() || undefined,
     };
-    console.log('Submitting payment data:', submitData);
     onSubmit(submitData);
   };
 

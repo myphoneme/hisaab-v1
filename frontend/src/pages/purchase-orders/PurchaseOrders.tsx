@@ -37,7 +37,6 @@ export function PurchaseOrders() {
       toast.success('Purchase order deleted successfully!');
     },
     onError: (error: any) => {
-      console.error('Delete PO error:', error);
       const errorMessage = error.response?.data?.detail || 'Failed to delete purchase order';
       toast.error(errorMessage);
     },
@@ -51,7 +50,6 @@ export function PurchaseOrders() {
       toast.success('Purchase order status updated successfully!');
     },
     onError: (error: any) => {
-      console.error('Update PO status error:', error);
       const errorMessage = error.response?.data?.detail || 'Failed to update purchase order status';
       toast.error(errorMessage);
     },
@@ -65,7 +63,6 @@ export function PurchaseOrders() {
       toast.success('Purchase order created successfully!');
     },
     onError: (error: any) => {
-      console.error('Create PO error:', error);
       let errorMessage = 'Failed to create purchase order';
 
       if (error.response?.data?.detail) {
@@ -94,7 +91,6 @@ export function PurchaseOrders() {
       toast.success('Purchase order updated successfully!');
     },
     onError: (error: any) => {
-      console.error('Update PO error:', error);
       const errorMessage = error.response?.data?.detail || 'Failed to update purchase order';
       toast.error(errorMessage);
     },

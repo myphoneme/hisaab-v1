@@ -52,7 +52,6 @@ export function Settings() {
       toast.success('Settings updated successfully!');
     },
     onError: (error: any) => {
-      console.error('Update settings error:', error);
       const errorMessage = formatErrorMessage(error);
       toast.error(errorMessage);
     },
@@ -65,7 +64,6 @@ export function Settings() {
       toast.success('Settings created successfully!');
     },
     onError: (error: any) => {
-      console.error('Create settings error:', error);
       const errorMessage = formatErrorMessage(error);
       toast.error(errorMessage);
     },

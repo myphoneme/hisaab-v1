@@ -86,7 +86,6 @@ export function BranchForm({ branch, onSubmit, onClose, isLoading }: BranchFormP
       email: data.email?.trim() || undefined,
       phone: data.phone?.trim() || undefined,
     };
-    console.log('Submitting branch data:', submitData);
     onSubmit(submitData);
   };
 

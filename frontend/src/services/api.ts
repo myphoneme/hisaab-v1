@@ -199,6 +199,10 @@ export const reportsApi = {
   getAgingReport: (params?: Record<string, unknown>) => api.get<unknown>('/reports/aging', params),
   getGSTR1: (params?: Record<string, unknown>) => api.get<unknown>('/reports/gstr-1', params),
   getGSTR3B: (params?: Record<string, unknown>) => api.get<unknown>('/reports/gstr-3b', params),
+  getRecentInvoices: (params?: Record<string, unknown>) => api.get<unknown>('/reports/recent-invoices', params),
+  getUpcomingPayments: (params?: Record<string, unknown>) => api.get<unknown>('/reports/upcoming-payments', params),
+  getProfitLoss: (params?: Record<string, unknown>) => api.get<unknown>('/reports/profit-loss', params),
+  getBalanceSheet: (params?: Record<string, unknown>) => api.get<unknown>('/reports/balance-sheet', params),
 };
 
 // Settings API

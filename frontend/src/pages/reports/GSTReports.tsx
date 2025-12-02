@@ -1,12 +1,13 @@
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { Download, FileText } from 'lucide-react';
+import { Download } from 'lucide-react';
 import { Card, CardContent, CardHeader } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
 import { BranchSelector } from '../../components/ui/BranchSelector';
 import { reportsApi } from '../../services/api';
 import { formatCurrency } from '../../lib/utils';
+import { exportToCSV, gstB2BExportColumns } from '../../lib/export';
 
 export function GSTReports() {
   const [activeTab, setActiveTab] = useState<'gstr1' | 'gstr3b'>('gstr1');
@@ -19,7 +20,7 @@ export function GSTReports() {
   const { data: gstr1, isLoading: gstr1Loading } = useQuery({
     queryKey: ['gstr-1', dateRange, branchId],
     queryFn: () => {
-      const params: any = { from_date: dateRange.from, to_date: dateRange.to };
+      const params: Record<string, unknown> = { from_date: dateRange.from, to_date: dateRange.to };
       if (branchId) params.branch_id = branchId;
       return reportsApi.getGSTR1(params);
     },
@@ -29,12 +30,56 @@ export function GSTReports() {
   const { data: gstr3b, isLoading: gstr3bLoading } = useQuery({
     queryKey: ['gstr-3b', dateRange, branchId],
     queryFn: () => {
-      const params: any = { from_date: dateRange.from, to_date: dateRange.to };
+      const params: Record<string, unknown> = { from_date: dateRange.from, to_date: dateRange.to };
       if (branchId) params.branch_id = branchId;
       return reportsApi.getGSTR3B(params);
     },
     enabled: activeTab === 'gstr3b',
   });
+
+  const handleExport = () => {
+    if (activeTab === 'gstr1' && gstr1?.b2b_supplies) {
+      exportToCSV(
+        gstr1.b2b_supplies,
+        gstB2BExportColumns,
+        `GSTR1_B2B_${dateRange.from}_to_${dateRange.to}`
+      );
+    } else if (activeTab === 'gstr3b' && gstr3b) {
+      // Export GSTR-3B summary as CSV
+      const gstr3bData = [{
+        period: `${dateRange.from} to ${dateRange.to}`,
+        outward_taxable: gstr3b.section_3_1?.taxable_value || 0,
+        outward_cgst: gstr3b.section_3_1?.cgst || 0,
+        outward_sgst: gstr3b.section_3_1?.sgst || 0,
+        outward_igst: gstr3b.section_3_1?.igst || 0,
+        itc_cgst: gstr3b.section_4_itc?.net_itc_available?.cgst || 0,
+        itc_sgst: gstr3b.section_4_itc?.net_itc_available?.sgst || 0,
+        itc_igst: gstr3b.section_4_itc?.net_itc_available?.igst || 0,
+        net_cgst: gstr3b.section_6_net_tax?.cgst || 0,
+        net_sgst: gstr3b.section_6_net_tax?.sgst || 0,
+        net_igst: gstr3b.section_6_net_tax?.igst || 0,
+      }];
+      exportToCSV(
+        gstr3bData,
+        [
+          { key: 'period', header: 'Period' },
+          { key: 'outward_taxable', header: 'Outward Taxable Value' },
+          { key: 'outward_cgst', header: 'Outward CGST' },
+          { key: 'outward_sgst', header: 'Outward SGST' },
+          { key: 'outward_igst', header: 'Outward IGST' },
+          { key: 'itc_cgst', header: 'ITC CGST' },
+          { key: 'itc_sgst', header: 'ITC SGST' },
+          { key: 'itc_igst', header: 'ITC IGST' },
+          { key: 'net_cgst', header: 'Net CGST Liability' },
+          { key: 'net_sgst', header: 'Net SGST Liability' },
+          { key: 'net_igst', header: 'Net IGST Liability' },
+        ],
+        `GSTR3B_${dateRange.from}_to_${dateRange.to}`
+      );
+    } else {
+      alert('No data to export. Please wait for data to load.');
+    }
+  };
 
   return (
     <div className="space-y-6">
@@ -43,9 +88,9 @@ export function GSTReports() {
           <h1 className="text-2xl font-bold text-gray-900">GST Reports</h1>
           <p className="text-gray-500 mt-1">GSTR-1 and GSTR-3B filing reports</p>
         </div>
-        <Button variant="outline">
+        <Button variant="outline" onClick={handleExport}>
           <Download className="h-4 w-4 mr-2" />
-          Export to Excel
+          Export to CSV
         </Button>
       </div>
 

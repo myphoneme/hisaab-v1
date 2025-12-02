@@ -66,7 +66,6 @@ export function AccountForm({ account, onSubmit, onClose, isLoading }: AccountFo
       parent_id: data.parent_id ? Number(data.parent_id) : undefined,
       is_active: data.is_active !== false,
     };
-    console.log('Submitting account data:', submitData);
     onSubmit(submitData);
   };
 

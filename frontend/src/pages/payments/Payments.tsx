@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
-import { Plus, Eye, Trash2, Search, DollarSign } from 'lucide-react';
+import { Plus, Eye, Trash2, Search, DollarSign, Pencil, X, Download } from 'lucide-react';
 import { paymentApi } from '../../services/api';
 import type { Payment, PaymentCreate } from '../../types';
 import { Card, CardContent, CardHeader } from '../../components/ui/Card';
@@ -11,24 +11,48 @@ import { Badge } from '../../components/ui/Badge';
 import { BranchSelector } from '../../components/ui/BranchSelector';
 import { formatCurrency } from '../../lib/utils';
 import { PaymentForm } from './PaymentForm';
+import { exportToCSV, paymentExportColumns } from '../../lib/export';
 
 export function Payments() {
   const [searchTerm, setSearchTerm] = useState('');
   const [branchId, setBranchId] = useState<number | string>('');
   const [showPaymentForm, setShowPaymentForm] = useState(false);
   const [selectedPayment, setSelectedPayment] = useState<Payment | null>(null);
+  const [viewingPayment, setViewingPayment] = useState<Payment | null>(null);
   const queryClient = useQueryClient();
 
   const { data: payments, isLoading } = useQuery<Payment[]>({
     queryKey: ['payments', branchId],
     queryFn: async () => {
-      const params: any = {};
+      const params: Record<string, unknown> = {};
       if (branchId) params.branch_id = branchId;
       const response = await paymentApi.getAll(params);
       // Handle paginated response
       return response?.items || [];
     },
   });
+
+  const handleExport = () => {
+    if (!filteredPayments || filteredPayments.length === 0) {
+      toast.error('No data to export');
+      return;
+    }
+    // Transform data for export
+    const exportData = filteredPayments.map(pmt => ({
+      payment_number: pmt.payment_number,
+      payment_date: pmt.payment_date,
+      invoice_number: pmt.invoice?.invoice_number || '',
+      party_name: pmt.client?.name || pmt.vendor?.name || '',
+      payment_type: pmt.payment_type,
+      payment_mode: pmt.payment_mode,
+      amount: pmt.amount,
+      tds_amount: pmt.tds_amount || 0,
+      reference_number: pmt.reference_number || '',
+      status: pmt.status,
+    }));
+    exportToCSV(exportData, paymentExportColumns, `Payments_${new Date().toISOString().split('T')[0]}`);
+    toast.success('Export completed');
+  };
 
   const createPaymentMutation = useMutation({
     mutationFn: (data: PaymentCreate) =>
@@ -41,8 +65,7 @@ export function Payments() {
       setShowPaymentForm(false);
       setSelectedPayment(null);
     },
-    onError: (error: any) => {
-      console.error('Payment mutation error:', error);
+    onError: (error: Error & { response?: { data?: { detail?: string } } }) => {
       const errorMessage = error.response?.data?.detail || 'Failed to record payment';
       toast.error(errorMessage);
     },
@@ -54,7 +77,7 @@ export function Payments() {
       queryClient.invalidateQueries({ queryKey: ['payments'] });
       toast.success('Payment deleted successfully!');
     },
-    onError: (error: any) => {
+    onError: () => {
       toast.error('Failed to delete payment');
     },
   });
@@ -87,15 +110,21 @@ export function Payments() {
           <h1 className="text-2xl font-bold text-gray-900">Payments</h1>
           <p className="text-gray-500 mt-1">Track receipts and payments</p>
         </div>
-        <Button
-          onClick={() => {
-            setSelectedPayment(null);
-            setShowPaymentForm(true);
-          }}
-        >
-          <Plus className="h-4 w-4 mr-2" />
-          Record Payment
-        </Button>
+        <div className="flex gap-2">
+          <Button variant="outline" onClick={handleExport}>
+            <Download className="h-4 w-4 mr-2" />
+            Export CSV
+          </Button>
+          <Button
+            onClick={() => {
+              setSelectedPayment(null);
+              setShowPaymentForm(true);
+            }}
+          >
+            <Plus className="h-4 w-4 mr-2" />
+            Record Payment
+          </Button>
+        </div>
       </div>
 
       <Card>
@@ -177,12 +206,27 @@ export function Payments() {
                         </span>
                       </td>
                       <td className="px-4 py-3 whitespace-nowrap text-right text-sm">
-                        <button className="text-blue-600 hover:text-blue-900 mr-3">
+                        <button
+                          onClick={() => setViewingPayment(payment)}
+                          className="text-blue-600 hover:text-blue-900 mr-3"
+                          title="View details"
+                        >
                           <Eye className="h-4 w-4" />
+                        </button>
+                        <button
+                          onClick={() => {
+                            setSelectedPayment(payment);
+                            setShowPaymentForm(true);
+                          }}
+                          className="text-green-600 hover:text-green-900 mr-3"
+                          title="Edit payment"
+                        >
+                          <Pencil className="h-4 w-4" />
                         </button>
                         <button
                           onClick={() => handleDelete(payment.id)}
                           className="text-red-600 hover:text-red-900"
+                          title="Delete payment"
                         >
                           <Trash2 className="h-4 w-4" />
                         </button>
@@ -207,6 +251,116 @@ export function Payments() {
           }}
           isLoading={createPaymentMutation.isPending}
         />
+      )}
+
+      {/* Payment View Modal */}
+      {viewingPayment && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between p-6 border-b">
+              <h2 className="text-2xl font-bold text-gray-900">Payment Details</h2>
+              <button onClick={() => setViewingPayment(null)} className="text-gray-400 hover:text-gray-600">
+                <X className="h-6 w-6" />
+              </button>
+            </div>
+            <div className="p-6 space-y-6">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-500">Payment Number</label>
+                  <p className="text-lg font-semibold">{viewingPayment.payment_number}</p>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-500">Date</label>
+                  <p className="text-lg">{new Date(viewingPayment.payment_date).toLocaleDateString('en-IN')}</p>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-500">Payment Type</label>
+                  <Badge variant={viewingPayment.payment_type === 'RECEIPT' ? 'success' : 'default'}>
+                    {viewingPayment.payment_type}
+                  </Badge>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-500">Status</label>
+                  <span className={`px-2 py-1 text-xs font-semibold rounded-full ${getStatusColor(viewingPayment.status)}`}>
+                    {viewingPayment.status}
+                  </span>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-500">Party</label>
+                  <p className="text-lg">{viewingPayment.client?.name || viewingPayment.vendor?.name || '-'}</p>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-500">Payment Mode</label>
+                  <p className="text-lg">{viewingPayment.payment_mode.replace('_', ' ')}</p>
+                </div>
+                {viewingPayment.reference_number && (
+                  <div>
+                    <label className="block text-sm font-medium text-gray-500">Reference Number</label>
+                    <p className="text-lg">{viewingPayment.reference_number}</p>
+                  </div>
+                )}
+                {viewingPayment.branch && (
+                  <div>
+                    <label className="block text-sm font-medium text-gray-500">Branch</label>
+                    <p className="text-lg">{viewingPayment.branch.branch_name}</p>
+                  </div>
+                )}
+              </div>
+
+              <div className="border-t pt-4">
+                <h3 className="text-lg font-semibold mb-4">Amount Details</h3>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-500">Gross Amount</label>
+                    <p className="text-xl font-bold text-gray-900">{formatCurrency(viewingPayment.gross_amount || 0)}</p>
+                  </div>
+                  {viewingPayment.tds_amount > 0 && (
+                    <div>
+                      <label className="block text-sm font-medium text-gray-500">TDS Amount</label>
+                      <p className="text-lg text-red-600">- {formatCurrency(viewingPayment.tds_amount)}</p>
+                    </div>
+                  )}
+                  {viewingPayment.tcs_amount > 0 && (
+                    <div>
+                      <label className="block text-sm font-medium text-gray-500">TCS Amount</label>
+                      <p className="text-lg text-green-600">+ {formatCurrency(viewingPayment.tcs_amount)}</p>
+                    </div>
+                  )}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-500">Net Amount</label>
+                    <p className="text-xl font-bold text-green-600">{formatCurrency(viewingPayment.net_amount || 0)}</p>
+                  </div>
+                </div>
+              </div>
+
+              {viewingPayment.notes && (
+                <div className="border-t pt-4">
+                  <label className="block text-sm font-medium text-gray-500 mb-2">Notes</label>
+                  <p className="text-gray-700">{viewingPayment.notes}</p>
+                </div>
+              )}
+
+              <div className="flex justify-end gap-3 pt-4 border-t">
+                <Button
+                  variant="secondary"
+                  onClick={() => setViewingPayment(null)}
+                >
+                  Close
+                </Button>
+                <Button
+                  onClick={() => {
+                    setSelectedPayment(viewingPayment);
+                    setViewingPayment(null);
+                    setShowPaymentForm(true);
+                  }}
+                >
+                  <Pencil className="h-4 w-4 mr-2" />
+                  Edit
+                </Button>
+              </div>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

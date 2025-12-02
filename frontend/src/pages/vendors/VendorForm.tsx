@@ -97,7 +97,6 @@ export function VendorForm({ vendor, onSubmit, onClose, isLoading }: VendorFormP
       bank_ifsc: data.bank_ifsc?.trim() || undefined,
       code: data.code?.trim() || undefined,
     };
-    console.log('Submitting vendor data:', submitData);
     onSubmit(submitData);
   };
 

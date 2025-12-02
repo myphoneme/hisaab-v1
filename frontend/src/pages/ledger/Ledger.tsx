@@ -1,13 +1,14 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
-import { Plus, BookOpen, Database, Upload } from 'lucide-react';
+import { Plus, BookOpen, Database, Upload, Download } from 'lucide-react';
 import { Card, CardContent, CardHeader } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
 import { ledgerApi } from '../../services/api';
 import { formatCurrency, formatDate } from '../../lib/utils';
 import type { ChartOfAccount, TrialBalance, ChartOfAccountCreate, LedgerStatement } from '../../types';
 import { AccountForm } from './AccountForm';
+import { exportToCSV, trialBalanceExportColumns, ledgerEntryExportColumns } from '../../lib/export';
 
 export function Ledger() {
   const queryClient = useQueryClient();
@@ -69,8 +70,7 @@ export function Ledger() {
       setShowAccountForm(false);
       setSelectedAccount(null);
     },
-    onError: (error: any) => {
-      console.error('Account mutation error:', error);
+    onError: (error: Error & { response?: { data?: { detail?: string } } }) => {
       const errorMessage = error.response?.data?.detail || 'Failed to save account';
       toast.error(errorMessage);
     },
@@ -83,7 +83,7 @@ export function Ledger() {
       queryClient.invalidateQueries({ queryKey: ['chart-of-accounts'] });
       toast.success(data.message);
     },
-    onError: (error: any) => {
+    onError: (error: Error & { response?: { data?: { detail?: string } } }) => {
       const errorMessage = error.response?.data?.detail || 'Failed to seed accounts';
       toast.error(errorMessage);
     },
@@ -98,15 +98,52 @@ export function Ledger() {
       const message = `Posted ${data.invoices_posted} invoices and ${data.payments_posted} payments to ledger`;
       toast.success(message);
       if (data.errors && data.errors.length > 0) {
-        toast.warning(`${data.errors.length} errors occurred`);
-        console.error('Posting errors:', data.errors);
+        toast.warning(`${data.errors.length} errors occurred during posting`);
       }
     },
-    onError: (error: any) => {
+    onError: (error: Error & { response?: { data?: { detail?: string } } }) => {
       const errorMessage = error.response?.data?.detail || 'Failed to post transactions';
       toast.error(errorMessage);
     },
   });
+
+  // Export handlers
+  const handleExportTrialBalance = () => {
+    if (!trialBalance?.accounts || trialBalance.accounts.length === 0) {
+      toast.error('No data to export');
+      return;
+    }
+    const exportData = trialBalance.accounts.map(acc => ({
+      account_code: acc.account_code,
+      account_name: acc.account_name,
+      account_type: acc.account_type,
+      debit: acc.debit,
+      credit: acc.credit,
+    }));
+    exportToCSV(exportData, trialBalanceExportColumns, `Trial_Balance_${asOnDate}`);
+    toast.success('Export completed');
+  };
+
+  const handleExportLedger = () => {
+    if (!ledgerStatement?.entries || ledgerStatement.entries.length === 0) {
+      toast.error('No data to export');
+      return;
+    }
+    const selectedAcc = allAccounts?.find(a => a.id === selectedAccountId);
+    const exportData = ledgerStatement.entries.map(entry => ({
+      entry_date: entry.entry_date,
+      entry_number: entry.entry_number,
+      account_code: selectedAcc?.code || '',
+      account_name: selectedAcc?.name || '',
+      description: entry.description,
+      debit: entry.debit,
+      credit: entry.credit,
+      reference_type: entry.reference_type,
+      reference_number: entry.reference_number,
+    }));
+    exportToCSV(exportData, ledgerEntryExportColumns, `Ledger_${selectedAcc?.code || 'entries'}_${fromDate}_to_${toDate}`);
+    toast.success('Export completed');
+  };
 
   // Group accounts by type
   const groupedAccounts = accounts?.reduce((acc, account) => {
@@ -229,6 +266,16 @@ export function Ledger() {
                     onChange={(e) => setToDate(e.target.value)}
                     className="border border-gray-300 rounded-md px-3 py-2"
                   />
+                </div>
+                <div className="pt-6">
+                  <Button
+                    variant="outline"
+                    onClick={handleExportLedger}
+                    disabled={!selectedAccountId || !ledgerStatement?.entries?.length}
+                  >
+                    <Download className="h-4 w-4 mr-2" />
+                    Export CSV
+                  </Button>
                 </div>
               </div>
             </CardHeader>
@@ -417,12 +464,22 @@ export function Ledger() {
             <CardHeader>
               <div className="flex justify-between items-center">
                 <h3 className="text-lg font-semibold">Trial Balance</h3>
-                <input
-                  type="date"
-                  value={asOnDate}
-                  onChange={(e) => setAsOnDate(e.target.value)}
-                  className="border border-gray-300 rounded-md px-3 py-1"
-                />
+                <div className="flex gap-2 items-center">
+                  <input
+                    type="date"
+                    value={asOnDate}
+                    onChange={(e) => setAsOnDate(e.target.value)}
+                    className="border border-gray-300 rounded-md px-3 py-1"
+                  />
+                  <Button
+                    variant="outline"
+                    onClick={handleExportTrialBalance}
+                    disabled={!trialBalance?.accounts?.length}
+                  >
+                    <Download className="h-4 w-4 mr-2" />
+                    Export CSV
+                  </Button>
+                </div>
               </div>
             </CardHeader>
             <CardContent className="p-6">

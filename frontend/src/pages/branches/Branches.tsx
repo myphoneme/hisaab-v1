@@ -31,7 +31,6 @@ export function Branches() {
       toast.success('Branch created successfully!');
     },
     onError: (error: any) => {
-      console.error('Create branch error:', error);
       let errorMessage = 'Failed to create branch';
 
       if (error.response?.data?.detail) {
@@ -60,7 +59,6 @@ export function Branches() {
       toast.success('Branch updated successfully!');
     },
     onError: (error: any) => {
-      console.error('Update branch error:', error);
       const errorMessage = error.response?.data?.detail || 'Failed to update branch';
       toast.error(errorMessage);
     },
@@ -73,7 +71,6 @@ export function Branches() {
       toast.success('Branch deactivated successfully!');
     },
     onError: (error: any) => {
-      console.error('Delete branch error:', error);
       const errorMessage = error.response?.data?.detail || 'Failed to deactivate branch';
       toast.error(errorMessage);
     },

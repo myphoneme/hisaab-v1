@@ -100,7 +100,6 @@ export function ClientForm({ client, onSubmit, onClose, isLoading }: ClientFormP
       contact_person: data.contact_person?.trim() || undefined,
       code: data.code?.trim() || undefined,
     };
-    console.log('Submitting client data:', submitData);
     onSubmit(submitData);
   };
 

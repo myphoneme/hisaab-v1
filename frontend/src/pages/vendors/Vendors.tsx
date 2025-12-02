@@ -32,7 +32,6 @@ export function Vendors() {
       toast.success('Vendor created successfully!');
     },
     onError: (error: any) => {
-      console.error('Create vendor error:', error);
       let errorMessage = 'Failed to create vendor';
 
       if (error.response?.data?.detail) {
@@ -61,7 +60,6 @@ export function Vendors() {
       toast.success('Vendor updated successfully!');
     },
     onError: (error: any) => {
-      console.error('Update vendor error:', error);
       const errorMessage = error.response?.data?.detail || 'Failed to update vendor';
       toast.error(errorMessage);
     },
@@ -74,7 +72,6 @@ export function Vendors() {
       toast.success('Vendor deleted successfully!');
     },
     onError: (error: any) => {
-      console.error('Delete vendor error:', error);
       const errorMessage = error.response?.data?.detail || 'Failed to delete vendor';
       toast.error(errorMessage);
     },

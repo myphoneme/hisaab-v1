@@ -31,7 +31,6 @@ export function BankAccounts() {
       toast.success('Bank account created successfully!');
     },
     onError: (error: any) => {
-      console.error('Create account error:', error);
       let errorMessage = 'Failed to create bank account';
 
       if (error.response?.data?.detail) {
@@ -60,7 +59,6 @@ export function BankAccounts() {
       toast.success('Bank account updated successfully!');
     },
     onError: (error: any) => {
-      console.error('Update account error:', error);
       const errorMessage = error.response?.data?.detail || 'Failed to update bank account';
       toast.error(errorMessage);
     },
@@ -73,7 +71,6 @@ export function BankAccounts() {
       toast.success('Bank account deactivated successfully!');
     },
     onError: (error: any) => {
-      console.error('Delete account error:', error);
       const errorMessage = error.response?.data?.detail || 'Failed to deactivate bank account';
       toast.error(errorMessage);
     },
@@ -86,7 +83,6 @@ export function BankAccounts() {
       toast.success('Default account set successfully!');
     },
     onError: (error: any) => {
-      console.error('Set default error:', error);
       const errorMessage = error.response?.data?.detail || 'Failed to set default account';
       toast.error(errorMessage);
     },

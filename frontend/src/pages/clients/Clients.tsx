@@ -32,7 +32,6 @@ export function Clients() {
       toast.success('Client created successfully!');
     },
     onError: (error: any) => {
-      console.error('Create client error:', error);
       let errorMessage = 'Failed to create client';
 
       if (error.response?.data?.detail) {
@@ -62,7 +61,6 @@ export function Clients() {
       toast.success('Client updated successfully!');
     },
     onError: (error: any) => {
-      console.error('Update client error:', error);
       const errorMessage = error.response?.data?.detail || 'Failed to update client';
       toast.error(errorMessage);
     },
@@ -75,7 +73,6 @@ export function Clients() {
       toast.success('Client deleted successfully!');
     },
     onError: (error: any) => {
-      console.error('Delete client error:', error);
       const errorMessage = error.response?.data?.detail || 'Failed to delete client';
       toast.error(errorMessage);
     },

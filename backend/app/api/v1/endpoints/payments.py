@@ -1,3 +1,4 @@
+import logging
 from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, status, Query
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -5,6 +6,8 @@ from sqlalchemy import select, func
 from sqlalchemy.orm import selectinload
 from datetime import date
 from decimal import Decimal
+
+logger = logging.getLogger(__name__)
 
 from app.db.session import get_db
 from app.models.payment import Payment, PaymentType, PaymentStatus
@@ -160,8 +163,7 @@ async def create_payment(
             await post_payment(db, payment, settings)
             await db.commit()
         except Exception as e:
-            # Log error but don't fail the payment creation
-            pass
+            logger.error(f"Failed to post ledger for payment {payment.payment_number}: {str(e)}")
 
     # Reload with relationships
     result = await db.execute(
@@ -290,8 +292,7 @@ async def delete_payment(
             try:
                 await reverse_payment_posting(db, payment, settings)
             except Exception as e:
-                # Log error but continue with deletion
-                pass
+                logger.error(f"Failed to reverse ledger for payment {payment.payment_number}: {str(e)}")
 
     # Reverse invoice update if linked
     if payment.invoice_id:

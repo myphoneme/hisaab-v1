@@ -102,7 +102,6 @@ export function PurchaseOrderForm({ purchaseOrder, onSubmit, onClose, isLoading 
   const total = subtotal + taxAmount - discountAmount;
 
   const handleFormSubmit = (data: PurchaseOrderCreate) => {
-    console.log('Submitting PO data:', data);
     onSubmit(data);
   };
 

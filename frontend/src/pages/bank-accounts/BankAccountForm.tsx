@@ -90,7 +90,6 @@ export function BankAccountForm({ account, onSubmit, onClose, isLoading }: BankA
 
       toast.success(`Bank details fetched: ${data.BANK} - ${data.BRANCH}`);
     } catch (error) {
-      console.error('IFSC lookup error:', error);
       toast.error('Could not fetch bank details. Please enter manually.');
     } finally {
       setIsLookingUp(false);
@@ -105,7 +104,6 @@ export function BankAccountForm({ account, onSubmit, onClose, isLoading }: BankA
       upi_id: data.upi_id?.trim() || undefined,
       swift_code: data.swift_code?.trim() || undefined,
     };
-    console.log('Submitting bank account data:', submitData);
     onSubmit(submitData);
   };
 
