@@ -338,7 +338,7 @@ export function InvoiceView() {
               <div className="space-y-2 text-sm">
                 <div className="flex justify-between">
                   <span className="text-gray-600">Subtotal:</span>
-                  <span className="font-medium">{formatCurrency(invoice.sub_total)}</span>
+                  <span className="font-medium">{formatCurrency(invoice.subtotal)}</span>
                 </div>
 
                 {invoice.is_interstate ? (

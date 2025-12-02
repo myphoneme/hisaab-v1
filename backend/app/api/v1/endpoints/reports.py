@@ -1,7 +1,7 @@
 from typing import Optional, List
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, func
+from sqlalchemy import select, func, case
 from sqlalchemy.orm import selectinload
 from datetime import date, datetime, timedelta
 from decimal import Decimal
@@ -661,14 +661,14 @@ async def get_profit_loss(
     # Revenue (Credit balance in REVENUE accounts)
     revenue_result = await db.execute(
         select(
-            ChartOfAccount.account_name,
-            ChartOfAccount.account_code,
+            ChartOfAccount.name.label('account_name'),
+            ChartOfAccount.code.label('account_code'),
             func.sum(LedgerEntry.credit - LedgerEntry.debit).label('amount')
         )
         .join(ChartOfAccount, LedgerEntry.account_id == ChartOfAccount.id)
         .where(ChartOfAccount.account_type == 'REVENUE')
         .where(*base_where)
-        .group_by(ChartOfAccount.id, ChartOfAccount.account_name, ChartOfAccount.account_code)
+        .group_by(ChartOfAccount.id, ChartOfAccount.name, ChartOfAccount.code)
         .having(func.sum(LedgerEntry.credit - LedgerEntry.debit) != 0)
     )
     revenue_items = revenue_result.all()
@@ -677,15 +677,15 @@ async def get_profit_loss(
     # Cost of Goods Sold (Debit balance in EXPENSE accounts with group 'COGS' or 'Cost of Goods Sold')
     cogs_result = await db.execute(
         select(
-            ChartOfAccount.account_name,
-            ChartOfAccount.account_code,
+            ChartOfAccount.name.label('account_name'),
+            ChartOfAccount.code.label('account_code'),
             func.sum(LedgerEntry.debit - LedgerEntry.credit).label('amount')
         )
         .join(ChartOfAccount, LedgerEntry.account_id == ChartOfAccount.id)
         .where(ChartOfAccount.account_type == 'EXPENSE')
         .where(ChartOfAccount.account_group.in_(['COGS', 'Cost of Goods Sold', 'Purchase']))
         .where(*base_where)
-        .group_by(ChartOfAccount.id, ChartOfAccount.account_name, ChartOfAccount.account_code)
+        .group_by(ChartOfAccount.id, ChartOfAccount.name, ChartOfAccount.code)
         .having(func.sum(LedgerEntry.debit - LedgerEntry.credit) != 0)
     )
     cogs_items = cogs_result.all()
@@ -694,15 +694,15 @@ async def get_profit_loss(
     # Operating Expenses (Debit balance in EXPENSE accounts excluding COGS)
     expenses_result = await db.execute(
         select(
-            ChartOfAccount.account_name,
-            ChartOfAccount.account_code,
+            ChartOfAccount.name.label('account_name'),
+            ChartOfAccount.code.label('account_code'),
             func.sum(LedgerEntry.debit - LedgerEntry.credit).label('amount')
         )
         .join(ChartOfAccount, LedgerEntry.account_id == ChartOfAccount.id)
         .where(ChartOfAccount.account_type == 'EXPENSE')
         .where(~ChartOfAccount.account_group.in_(['COGS', 'Cost of Goods Sold', 'Purchase']))
         .where(*base_where)
-        .group_by(ChartOfAccount.id, ChartOfAccount.account_name, ChartOfAccount.account_code)
+        .group_by(ChartOfAccount.id, ChartOfAccount.name, ChartOfAccount.code)
         .having(func.sum(LedgerEntry.debit - LedgerEntry.credit) != 0)
     )
     expense_items = expenses_result.all()
@@ -761,15 +761,15 @@ async def get_balance_sheet(
     # Assets (Debit balance)
     assets_result = await db.execute(
         select(
-            ChartOfAccount.account_name,
-            ChartOfAccount.account_code,
+            ChartOfAccount.name.label('account_name'),
+            ChartOfAccount.code.label('account_code'),
             ChartOfAccount.account_group,
             func.sum(LedgerEntry.debit - LedgerEntry.credit).label('amount')
         )
         .join(ChartOfAccount, LedgerEntry.account_id == ChartOfAccount.id)
         .where(ChartOfAccount.account_type == 'ASSET')
         .where(*base_where)
-        .group_by(ChartOfAccount.id, ChartOfAccount.account_name, ChartOfAccount.account_code, ChartOfAccount.account_group)
+        .group_by(ChartOfAccount.id, ChartOfAccount.name, ChartOfAccount.code, ChartOfAccount.account_group)
         .having(func.sum(LedgerEntry.debit - LedgerEntry.credit) != 0)
     )
     asset_items = assets_result.all()
@@ -787,15 +787,15 @@ async def get_balance_sheet(
     # Liabilities (Credit balance)
     liabilities_result = await db.execute(
         select(
-            ChartOfAccount.account_name,
-            ChartOfAccount.account_code,
+            ChartOfAccount.name.label('account_name'),
+            ChartOfAccount.code.label('account_code'),
             ChartOfAccount.account_group,
             func.sum(LedgerEntry.credit - LedgerEntry.debit).label('amount')
         )
         .join(ChartOfAccount, LedgerEntry.account_id == ChartOfAccount.id)
         .where(ChartOfAccount.account_type == 'LIABILITY')
         .where(*base_where)
-        .group_by(ChartOfAccount.id, ChartOfAccount.account_name, ChartOfAccount.account_code, ChartOfAccount.account_group)
+        .group_by(ChartOfAccount.id, ChartOfAccount.name, ChartOfAccount.code, ChartOfAccount.account_group)
         .having(func.sum(LedgerEntry.credit - LedgerEntry.debit) != 0)
     )
     liability_items = liabilities_result.all()
@@ -813,14 +813,14 @@ async def get_balance_sheet(
     # Equity (Credit balance)
     equity_result = await db.execute(
         select(
-            ChartOfAccount.account_name,
-            ChartOfAccount.account_code,
+            ChartOfAccount.name.label('account_name'),
+            ChartOfAccount.code.label('account_code'),
             func.sum(LedgerEntry.credit - LedgerEntry.debit).label('amount')
         )
         .join(ChartOfAccount, LedgerEntry.account_id == ChartOfAccount.id)
         .where(ChartOfAccount.account_type == 'EQUITY')
         .where(*base_where)
-        .group_by(ChartOfAccount.id, ChartOfAccount.account_name, ChartOfAccount.account_code)
+        .group_by(ChartOfAccount.id, ChartOfAccount.name, ChartOfAccount.code)
         .having(func.sum(LedgerEntry.credit - LedgerEntry.debit) != 0)
     )
     equity_items = equity_result.all()
@@ -830,7 +830,7 @@ async def get_balance_sheet(
     retained_earnings_result = await db.execute(
         select(
             func.sum(
-                func.case(
+                case(
                     (ChartOfAccount.account_type == 'REVENUE', LedgerEntry.credit - LedgerEntry.debit),
                     else_=-(LedgerEntry.debit - LedgerEntry.credit)
                 )
