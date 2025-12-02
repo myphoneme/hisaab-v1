@@ -137,7 +137,7 @@ export const invoiceApi = {
   create: (data: unknown) => api.post<Invoice>('/invoices', data),
   update: (id: number, data: unknown) => api.patch<Invoice>(`/invoices/${id}`, data),
   delete: (id: number) => api.delete<{ message: string }>(`/invoices/${id}`),
-  updateStatus: (id: number, status: string) => api.patch<Invoice>(`/invoices/${id}/status`, status),
+  updateStatus: (id: number, status: string) => api.patch<Invoice>(`/invoices/${id}/status`, { status_update: status }),
 };
 
 // Payment API
@@ -148,6 +148,15 @@ export const paymentApi = {
   update: (id: number, data: unknown) => api.patch<Payment>(`/payments/${id}`, data),
   delete: (id: number) => api.delete<{ message: string }>(`/payments/${id}`),
 };
+
+// Post All Unposted Response type
+export interface PostAllUnpostedResponse {
+  message: string;
+  invoices_posted: number;
+  payments_posted: number;
+  total_posted: number;
+  errors: string[] | null;
+}
 
 // Ledger API
 export const ledgerApi = {
@@ -161,6 +170,8 @@ export const ledgerApi = {
   // Ledger Entries
   getEntries: (params?: Record<string, unknown>) => api.get<PaginatedResponse<LedgerEntry>>('/ledger/entries', params),
   createJournalEntry: (data: unknown) => api.post<LedgerEntry>('/ledger/journal-entry', data),
+  // Posting
+  postAllUnposted: () => api.post<PostAllUnpostedResponse>('/ledger/post-all-unposted'),
   // Reports
   getStatement: (accountId: number, params?: Record<string, unknown>) =>
     api.get<LedgerStatement>(`/ledger/statement/${accountId}`, params),

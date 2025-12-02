@@ -1,6 +1,8 @@
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Edit, Printer } from 'lucide-react';
+import { ArrowLeft, Edit, Printer, Send, XCircle } from 'lucide-react';
+import { useState } from 'react';
+import { toast } from 'sonner';
 import { invoiceApi, settingsApi, paymentApi } from '../../services/api';
 import { Button } from '../../components/ui/Button';
 import { Card, CardContent, CardHeader } from '../../components/ui/Card';
@@ -10,6 +12,48 @@ import type { Invoice, CompanySettings, Payment } from '../../types';
 export function InvoiceView() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
+  const [showSendConfirm, setShowSendConfirm] = useState(false);
+  const [showCancelConfirm, setShowCancelConfirm] = useState(false);
+
+  // Status update mutation
+  const statusMutation = useMutation({
+    mutationFn: ({ invoiceId, status }: { invoiceId: number; status: string }) =>
+      invoiceApi.updateStatus(invoiceId, status),
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: ['invoice', id] });
+      queryClient.invalidateQueries({ queryKey: ['invoices'] });
+      setShowSendConfirm(false);
+      setShowCancelConfirm(false);
+      if (variables.status === 'SENT') {
+        toast.success('Invoice sent and posted to ledger');
+      } else if (variables.status === 'CANCELLED') {
+        toast.success('Invoice cancelled');
+      }
+    },
+    onError: (error: any) => {
+      const detail = error.response?.data?.detail;
+      let msg = 'Failed to update invoice status';
+      if (typeof detail === 'string') {
+        msg = detail;
+      } else if (Array.isArray(detail) && detail.length > 0) {
+        msg = detail[0]?.msg || msg;
+      }
+      toast.error(msg);
+    },
+  });
+
+  const handleSendInvoice = () => {
+    if (id) {
+      statusMutation.mutate({ invoiceId: Number(id), status: 'SENT' });
+    }
+  };
+
+  const handleCancelInvoice = () => {
+    if (id) {
+      statusMutation.mutate({ invoiceId: Number(id), status: 'CANCELLED' });
+    }
+  };
 
   // Fetch invoice data
   const { data: invoice, isLoading } = useQuery<Invoice>({
@@ -63,6 +107,48 @@ export function InvoiceView() {
 
   return (
     <div className="space-y-6">
+      {/* Send Invoice Confirmation Modal */}
+      {showSendConfirm && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white p-6 rounded-lg shadow-lg max-w-md">
+            <h3 className="text-lg font-semibold mb-4">Send Invoice?</h3>
+            <p className="text-gray-600 mb-6">
+              This will mark the invoice as SENT and create ledger entries.
+              You won't be able to edit the invoice after sending.
+            </p>
+            <div className="flex justify-end gap-3">
+              <Button variant="outline" onClick={() => setShowSendConfirm(false)}>
+                Cancel
+              </Button>
+              <Button onClick={handleSendInvoice} disabled={statusMutation.isPending}>
+                {statusMutation.isPending ? 'Sending...' : 'Yes, Send Invoice'}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Cancel Invoice Confirmation Modal */}
+      {showCancelConfirm && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white p-6 rounded-lg shadow-lg max-w-md">
+            <h3 className="text-lg font-semibold mb-4">Cancel Invoice?</h3>
+            <p className="text-gray-600 mb-6">
+              This will cancel the invoice and reverse any ledger entries.
+              This action cannot be undone.
+            </p>
+            <div className="flex justify-end gap-3">
+              <Button variant="outline" onClick={() => setShowCancelConfirm(false)}>
+                No, Keep Invoice
+              </Button>
+              <Button variant="destructive" onClick={handleCancelInvoice} disabled={statusMutation.isPending}>
+                {statusMutation.isPending ? 'Cancelling...' : 'Yes, Cancel Invoice'}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Header Actions - Hide on print */}
       <div className="no-print flex justify-between items-center">
         <Button variant="outline" onClick={() => navigate('/invoices')}>
@@ -70,14 +156,40 @@ export function InvoiceView() {
           Back to Invoices
         </Button>
         <div className="flex gap-3">
+          {/* Send Invoice Button - Only visible for DRAFT status */}
+          {invoice.status === 'DRAFT' && (
+            <Button
+              className="bg-blue-600 hover:bg-blue-700"
+              onClick={() => setShowSendConfirm(true)}
+            >
+              <Send className="h-4 w-4 mr-2" />
+              Send Invoice
+            </Button>
+          )}
+
+          {/* Cancel Invoice Button - Visible for DRAFT, SENT, PARTIAL statuses */}
+          {['DRAFT', 'SENT', 'PARTIAL'].includes(invoice.status) && (
+            <Button
+              variant="destructive"
+              onClick={() => setShowCancelConfirm(true)}
+            >
+              <XCircle className="h-4 w-4 mr-2" />
+              Cancel Invoice
+            </Button>
+          )}
+
           <Button variant="outline" onClick={handlePrint}>
             <Printer className="h-4 w-4 mr-2" />
             Print Invoice
           </Button>
-          <Button onClick={() => navigate(`/invoices/${invoice.id}/edit`)}>
-            <Edit className="h-4 w-4 mr-2" />
-            Edit Invoice
-          </Button>
+
+          {/* Edit Button - Only visible for DRAFT status */}
+          {invoice.status === 'DRAFT' && (
+            <Button onClick={() => navigate(`/invoices/${invoice.id}/edit`)}>
+              <Edit className="h-4 w-4 mr-2" />
+              Edit Invoice
+            </Button>
+          )}
         </div>
       </div>
 

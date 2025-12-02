@@ -1,5 +1,5 @@
 from typing import Optional
-from fastapi import APIRouter, Depends, HTTPException, status, Query
+from fastapi import APIRouter, Depends, HTTPException, status, Query, Body
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func
 from sqlalchemy.orm import selectinload
@@ -385,7 +385,7 @@ async def update_invoice(
 @router.patch("/{invoice_id}/status", response_model=InvoiceResponse)
 async def update_invoice_status(
     invoice_id: int,
-    status_update: InvoiceStatus,
+    status_update: InvoiceStatus = Body(..., embed=True),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):

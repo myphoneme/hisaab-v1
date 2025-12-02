@@ -30,6 +30,11 @@ from app.schemas.common import PaginatedResponse, Message
 from app.core.security import get_current_user
 from app.services.number_generator import generate_voucher_number
 from app.services.chart_of_accounts_seeder import seed_default_accounts, check_accounts_seeded
+from app.services.ledger_posting import (
+    post_invoice, post_payment, get_company_settings
+)
+from app.models.invoice import Invoice, InvoiceStatus
+from app.models.payment import Payment
 
 router = APIRouter()
 
@@ -373,7 +378,7 @@ async def get_ledger_statement(
     return LedgerStatement(
         account_code=account.code,
         account_name=account.name,
-        account_type=account.account_type.value,
+        account_type=account.account_type,
         opening_balance=opening_balance,
         total_debit=total_debit,
         total_credit=total_credit,
@@ -439,8 +444,8 @@ async def get_trial_balance(
             TrialBalanceItem(
                 account_code=account.code,
                 account_name=account.name,
-                account_type=account.account_type.value,
-                account_group=account.account_group.value,
+                account_type=account.account_type,
+                account_group=account.account_group,
                 debit=debit_balance,
                 credit=credit_balance,
             )
@@ -455,3 +460,73 @@ async def get_trial_balance(
         total_debit=total_debit,
         total_credit=total_credit,
     )
+
+
+@router.post("/post-all-unposted")
+async def post_all_unposted(
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """
+    Post all unposted invoices and payments to the ledger.
+    This is useful for migrating existing transactions that skipped the SENT status.
+    """
+    settings = await get_company_settings(db)
+    if not settings:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Company settings not found. Please configure settings first."
+        )
+
+    # Check if essential GL accounts are mapped
+    if not settings.default_ar_account_id or not settings.default_sales_account_id:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="GL accounts not mapped. Please seed default accounts and configure settings."
+        )
+
+    invoices_posted = 0
+    payments_posted = 0
+    errors = []
+
+    # Find unposted invoices with status SENT, PARTIAL, or PAID
+    invoices_result = await db.execute(
+        select(Invoice)
+        .where(Invoice.is_posted == False)
+        .where(Invoice.status.in_([
+            InvoiceStatus.SENT,
+            InvoiceStatus.PARTIAL,
+            InvoiceStatus.PAID
+        ]))
+    )
+    unposted_invoices = invoices_result.scalars().all()
+
+    for invoice in unposted_invoices:
+        try:
+            await post_invoice(db, invoice, settings)
+            invoices_posted += 1
+        except Exception as e:
+            errors.append(f"Invoice {invoice.invoice_number}: {str(e)}")
+
+    # Find unposted payments
+    payments_result = await db.execute(
+        select(Payment).where(Payment.is_posted == False)
+    )
+    unposted_payments = payments_result.scalars().all()
+
+    for payment in unposted_payments:
+        try:
+            await post_payment(db, payment, settings)
+            payments_posted += 1
+        except Exception as e:
+            errors.append(f"Payment {payment.payment_number}: {str(e)}")
+
+    await db.commit()
+
+    return {
+        "message": "Posting complete",
+        "invoices_posted": invoices_posted,
+        "payments_posted": payments_posted,
+        "total_posted": invoices_posted + payments_posted,
+        "errors": errors if errors else None
+    }

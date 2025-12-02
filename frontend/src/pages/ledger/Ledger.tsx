@@ -1,20 +1,37 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
-import { Plus, BookOpen, Database } from 'lucide-react';
+import { Plus, BookOpen, Database, Upload } from 'lucide-react';
 import { Card, CardContent, CardHeader } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
 import { ledgerApi } from '../../services/api';
-import { formatCurrency } from '../../lib/utils';
-import type { ChartOfAccount, TrialBalance, ChartOfAccountCreate } from '../../types';
+import { formatCurrency, formatDate } from '../../lib/utils';
+import type { ChartOfAccount, TrialBalance, ChartOfAccountCreate, LedgerStatement } from '../../types';
 import { AccountForm } from './AccountForm';
 
 export function Ledger() {
   const queryClient = useQueryClient();
-  const [activeTab, setActiveTab] = useState<'accounts' | 'trial-balance'>('accounts');
+  const [activeTab, setActiveTab] = useState<'ledger' | 'accounts' | 'trial-balance'>('ledger');
   const [asOnDate, setAsOnDate] = useState(new Date().toISOString().split('T')[0]);
   const [showAccountForm, setShowAccountForm] = useState(false);
   const [selectedAccount, setSelectedAccount] = useState<ChartOfAccount | null>(null);
+
+  // Ledger view state
+  const [selectedAccountId, setSelectedAccountId] = useState<number | null>(null);
+  const today = new Date();
+  const firstDayOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
+  const [fromDate, setFromDate] = useState(firstDayOfMonth.toISOString().split('T')[0]);
+  const [toDate, setToDate] = useState(today.toISOString().split('T')[0]);
+
+  // Fetch all accounts for dropdown
+  const { data: allAccountsData } = useQuery({
+    queryKey: ['all-accounts'],
+    queryFn: async () => {
+      const response = await ledgerApi.getAccounts({ page_size: 100 });
+      return response.items || [];
+    },
+  });
+  const allAccounts = allAccountsData as ChartOfAccount[] | undefined;
 
   const { data: accountsData, isLoading: accountsLoading } = useQuery({
     queryKey: ['chart-of-accounts'],
@@ -23,6 +40,13 @@ export function Ledger() {
       return response.items || [];
     },
     enabled: activeTab === 'accounts',
+  });
+
+  // Ledger statement query
+  const { data: ledgerStatement, isLoading: ledgerLoading } = useQuery<LedgerStatement>({
+    queryKey: ['ledger-statement', selectedAccountId, fromDate, toDate],
+    queryFn: () => ledgerApi.getStatement(selectedAccountId!, { from_date: fromDate, to_date: toDate }),
+    enabled: activeTab === 'ledger' && selectedAccountId !== null,
   });
 
   const { data: trialBalance, isLoading: trialBalanceLoading } = useQuery<TrialBalance>({
@@ -65,6 +89,25 @@ export function Ledger() {
     },
   });
 
+  // Post all unposted transactions mutation
+  const postAllMutation = useMutation({
+    mutationFn: () => ledgerApi.postAllUnposted(),
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ['ledger-statement'] });
+      queryClient.invalidateQueries({ queryKey: ['trial-balance'] });
+      const message = `Posted ${data.invoices_posted} invoices and ${data.payments_posted} payments to ledger`;
+      toast.success(message);
+      if (data.errors && data.errors.length > 0) {
+        toast.warning(`${data.errors.length} errors occurred`);
+        console.error('Posting errors:', data.errors);
+      }
+    },
+    onError: (error: any) => {
+      const errorMessage = error.response?.data?.detail || 'Failed to post transactions';
+      toast.error(errorMessage);
+    },
+  });
+
   // Group accounts by type
   const groupedAccounts = accounts?.reduce((acc, account) => {
     if (!acc[account.account_type]) {
@@ -82,6 +125,15 @@ export function Ledger() {
           <p className="text-gray-500 mt-1">Chart of accounts and trial balance</p>
         </div>
         <div className="flex gap-2">
+          <Button
+            variant="outline"
+            onClick={() => postAllMutation.mutate()}
+            disabled={postAllMutation.isPending}
+            className="bg-green-50 hover:bg-green-100 text-green-700 border-green-300"
+          >
+            <Upload className="h-4 w-4 mr-2" />
+            {postAllMutation.isPending ? 'Posting...' : 'Post All Unposted'}
+          </Button>
           <Button
             variant="outline"
             onClick={() => seedAccountsMutation.mutate()}
@@ -107,6 +159,16 @@ export function Ledger() {
       <div className="border-b border-gray-200">
         <nav className="-mb-px flex space-x-8">
           <button
+            onClick={() => setActiveTab('ledger')}
+            className={`py-2 px-1 border-b-2 font-medium text-sm ${
+              activeTab === 'ledger'
+                ? 'border-blue-500 text-blue-600'
+                : 'border-transparent text-gray-500 hover:text-gray-700'
+            }`}
+          >
+            Ledger
+          </button>
+          <button
             onClick={() => setActiveTab('accounts')}
             className={`py-2 px-1 border-b-2 font-medium text-sm ${
               activeTab === 'accounts'
@@ -128,6 +190,174 @@ export function Ledger() {
           </button>
         </nav>
       </div>
+
+      {/* Ledger View */}
+      {activeTab === 'ledger' && (
+        <div className="space-y-4">
+          <Card>
+            <CardHeader>
+              <div className="flex flex-wrap gap-4 items-end">
+                <div className="flex-1 min-w-[200px]">
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Account</label>
+                  <select
+                    value={selectedAccountId || ''}
+                    onChange={(e) => setSelectedAccountId(e.target.value ? Number(e.target.value) : null)}
+                    className="w-full border border-gray-300 rounded-md px-3 py-2"
+                  >
+                    <option value="">Select Account</option>
+                    {allAccounts?.map((acc) => (
+                      <option key={acc.id} value={acc.id}>
+                        {acc.code} - {acc.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">From Date</label>
+                  <input
+                    type="date"
+                    value={fromDate}
+                    onChange={(e) => setFromDate(e.target.value)}
+                    className="border border-gray-300 rounded-md px-3 py-2"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">To Date</label>
+                  <input
+                    type="date"
+                    value={toDate}
+                    onChange={(e) => setToDate(e.target.value)}
+                    className="border border-gray-300 rounded-md px-3 py-2"
+                  />
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent className="p-6">
+              {!selectedAccountId ? (
+                <p className="text-center text-gray-500 py-8">Select an account to view ledger</p>
+              ) : ledgerLoading ? (
+                <p className="text-center text-gray-500 py-8">Loading ledger...</p>
+              ) : ledgerStatement ? (
+                <div className="overflow-x-auto">
+                  {/* Account Info */}
+                  <div className="mb-4 p-4 bg-gray-50 rounded-lg">
+                    <h3 className="font-semibold text-lg">{ledgerStatement.account_code} - {ledgerStatement.account_name}</h3>
+                    <p className="text-sm text-gray-600">Type: {ledgerStatement.account_type}</p>
+                  </div>
+
+                  {/* Ledger Table */}
+                  <table className="w-full">
+                    <thead className="bg-gray-100">
+                      <tr>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500">Date</th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500">Voucher</th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500">Narration</th>
+                        <th className="px-4 py-3 text-right text-xs font-medium text-gray-500">Debit</th>
+                        <th className="px-4 py-3 text-right text-xs font-medium text-gray-500">Credit</th>
+                        <th className="px-4 py-3 text-right text-xs font-medium text-gray-500">Balance</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {/* Opening Balance Row */}
+                      {(() => {
+                        const isDebitNormal = ['ASSET', 'EXPENSE'].includes(ledgerStatement.account_type);
+                        const openingBal = Number(ledgerStatement.opening_balance) || 0;
+                        return (
+                          <tr className="bg-blue-50 font-medium">
+                            <td className="px-4 py-2 text-sm">{formatDate(fromDate)}</td>
+                            <td className="px-4 py-2 text-sm" colSpan={2}>Opening Balance</td>
+                            <td className="px-4 py-2 text-sm text-right">-</td>
+                            <td className="px-4 py-2 text-sm text-right">-</td>
+                            <td className="px-4 py-2 text-sm text-right font-semibold">
+                              {formatCurrency(Math.abs(openingBal))}
+                              {isDebitNormal
+                                ? (openingBal >= 0 ? ' Dr' : ' Cr')
+                                : (openingBal >= 0 ? ' Cr' : ' Dr')
+                              }
+                            </td>
+                          </tr>
+                        );
+                      })()}
+
+                      {/* Transaction Rows */}
+                      {(() => {
+                        let runningBalance = Number(ledgerStatement.opening_balance) || 0;
+                        const isDebitNormal = ['ASSET', 'EXPENSE'].includes(ledgerStatement.account_type);
+
+                        return ledgerStatement.entries.map((entry, index) => {
+                          const debit = Number(entry.debit) || 0;
+                          const credit = Number(entry.credit) || 0;
+
+                          // For ASSET/EXPENSE: debit increases, credit decreases
+                          // For LIABILITY/REVENUE/EQUITY: credit increases, debit decreases
+                          if (isDebitNormal) {
+                            runningBalance = runningBalance + debit - credit;
+                          } else {
+                            runningBalance = runningBalance + credit - debit;
+                          }
+
+                          return (
+                            <tr key={entry.id || index} className="border-b hover:bg-gray-50">
+                              <td className="px-4 py-2 text-sm">{formatDate(entry.entry_date)}</td>
+                              <td className="px-4 py-2 text-sm">
+                                <span className="font-medium">{entry.voucher_number}</span>
+                                <span className="text-xs text-gray-500 ml-2">({entry.reference_type})</span>
+                              </td>
+                              <td className="px-4 py-2 text-sm">{entry.narration || '-'}</td>
+                              <td className="px-4 py-2 text-sm text-right">
+                                {debit > 0 ? formatCurrency(debit) : '-'}
+                              </td>
+                              <td className="px-4 py-2 text-sm text-right">
+                                {credit > 0 ? formatCurrency(credit) : '-'}
+                              </td>
+                              <td className="px-4 py-2 text-sm text-right font-medium">
+                                {formatCurrency(Math.abs(runningBalance))}
+                                {isDebitNormal
+                                  ? (runningBalance >= 0 ? ' Dr' : ' Cr')
+                                  : (runningBalance >= 0 ? ' Cr' : ' Dr')
+                                }
+                              </td>
+                            </tr>
+                          );
+                        });
+                      })()}
+
+                      {/* Closing Balance Row */}
+                      {(() => {
+                        const isDebitNormal = ['ASSET', 'EXPENSE'].includes(ledgerStatement.account_type);
+                        const closingBal = Number(ledgerStatement.closing_balance) || 0;
+                        const totalDebit = Number(ledgerStatement.total_debit) || 0;
+                        const totalCredit = Number(ledgerStatement.total_credit) || 0;
+                        return (
+                          <tr className="bg-green-50 font-bold">
+                            <td className="px-4 py-3 text-sm">{formatDate(toDate)}</td>
+                            <td className="px-4 py-3 text-sm" colSpan={2}>Closing Balance</td>
+                            <td className="px-4 py-3 text-sm text-right">{formatCurrency(totalDebit)}</td>
+                            <td className="px-4 py-3 text-sm text-right">{formatCurrency(totalCredit)}</td>
+                            <td className="px-4 py-3 text-sm text-right">
+                              {formatCurrency(Math.abs(closingBal))}
+                              {isDebitNormal
+                                ? (closingBal >= 0 ? ' Dr' : ' Cr')
+                                : (closingBal >= 0 ? ' Cr' : ' Dr')
+                              }
+                            </td>
+                          </tr>
+                        );
+                      })()}
+                    </tbody>
+                  </table>
+
+                  {ledgerStatement.entries.length === 0 && (
+                    <p className="text-center text-gray-500 py-4 mt-4">No transactions found for this period</p>
+                  )}
+                </div>
+              ) : (
+                <p className="text-center text-gray-500 py-8">No data available</p>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+      )}
 
       {/* Chart of Accounts */}
       {activeTab === 'accounts' && (

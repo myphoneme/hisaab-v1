@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Plus, Eye, Trash2, Search, FileText, Edit } from 'lucide-react';
+import { Plus, Eye, Trash2, Search, FileText, Edit, Send } from 'lucide-react';
+import { toast } from 'sonner';
 import { invoiceApi } from '../../services/api';
 import type { Invoice } from '../../types';
 import { Card, CardContent, CardHeader } from '../../components/ui/Card';
@@ -15,13 +16,15 @@ export function Invoices() {
   const navigate = useNavigate();
   const [searchTerm, setSearchTerm] = useState('');
   const [branchId, setBranchId] = useState<number | string>('');
+  const [statusFilter, setStatusFilter] = useState<string>('');
   const queryClient = useQueryClient();
 
   const { data: invoices, isLoading } = useQuery<Invoice[]>({
-    queryKey: ['invoices', branchId],
+    queryKey: ['invoices', branchId, statusFilter],
     queryFn: async () => {
       const params: any = {};
       if (branchId) params.branch_id = branchId;
+      if (statusFilter) params.status_filter = statusFilter;
       const response = await invoiceApi.getAll(params);
       // Handle paginated response
       return response?.items || [];
@@ -32,6 +35,25 @@ export function Invoices() {
     mutationFn: (id: number) => invoiceApi.delete(id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['invoices'] });
+    },
+  });
+
+  // Send invoice mutation
+  const sendMutation = useMutation({
+    mutationFn: (id: number) => invoiceApi.updateStatus(id, 'SENT'),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['invoices'] });
+      toast.success('Invoice sent and posted to ledger');
+    },
+    onError: (error: any) => {
+      const detail = error.response?.data?.detail;
+      let msg = 'Failed to send invoice';
+      if (typeof detail === 'string') {
+        msg = detail;
+      } else if (Array.isArray(detail) && detail.length > 0) {
+        msg = detail[0]?.msg || msg;
+      }
+      toast.error(msg);
     },
   });
 
@@ -75,13 +97,28 @@ export function Invoices() {
       <Card>
         <CardHeader>
           <div className="flex gap-4">
-            <div className="w-64">
+            <div className="w-48">
               <BranchSelector
                 value={branchId}
                 onChange={setBranchId}
                 label=""
                 required={false}
               />
+            </div>
+            <div className="w-40">
+              <select
+                value={statusFilter}
+                onChange={(e) => setStatusFilter(e.target.value)}
+                className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm"
+              >
+                <option value="">All Statuses</option>
+                <option value="DRAFT">Draft</option>
+                <option value="SENT">Sent</option>
+                <option value="PARTIAL">Partial</option>
+                <option value="PAID">Paid</option>
+                <option value="OVERDUE">Overdue</option>
+                <option value="CANCELLED">Cancelled</option>
+              </select>
             </div>
             <div className="relative flex-1">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
@@ -154,20 +191,41 @@ export function Invoices() {
                         >
                           <Eye className="h-4 w-4" />
                         </button>
-                        <button
-                          onClick={() => navigate(`/invoices/${invoice.id}/edit`)}
-                          className="text-green-600 hover:text-green-900 mr-3"
-                          title="Edit"
-                        >
-                          <Edit className="h-4 w-4" />
-                        </button>
-                        <button
-                          onClick={() => handleDelete(invoice.id)}
-                          className="text-red-600 hover:text-red-900"
-                          title="Delete"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </button>
+                        {/* Send button - only for DRAFT */}
+                        {invoice.status === 'DRAFT' && (
+                          <button
+                            onClick={() => {
+                              if (window.confirm('Send this invoice? This will create ledger entries.')) {
+                                sendMutation.mutate(invoice.id);
+                              }
+                            }}
+                            className="text-blue-600 hover:text-blue-900 mr-3"
+                            title="Send Invoice"
+                            disabled={sendMutation.isPending}
+                          >
+                            <Send className="h-4 w-4" />
+                          </button>
+                        )}
+                        {/* Edit button - only for DRAFT */}
+                        {invoice.status === 'DRAFT' && (
+                          <button
+                            onClick={() => navigate(`/invoices/${invoice.id}/edit`)}
+                            className="text-green-600 hover:text-green-900 mr-3"
+                            title="Edit"
+                          >
+                            <Edit className="h-4 w-4" />
+                          </button>
+                        )}
+                        {/* Delete button - only for DRAFT */}
+                        {invoice.status === 'DRAFT' && (
+                          <button
+                            onClick={() => handleDelete(invoice.id)}
+                            className="text-red-600 hover:text-red-900"
+                            title="Delete"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </button>
+                        )}
                       </td>
                     </tr>
                   ))}
