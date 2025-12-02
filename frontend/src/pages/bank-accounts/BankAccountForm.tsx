@@ -1,10 +1,24 @@
+import { useState } from 'react';
 import { useForm } from 'react-hook-form';
-import { X } from 'lucide-react';
+import { X, Search, Loader2 } from 'lucide-react';
+import { toast } from 'sonner';
 import type { BankAccount, BankAccountCreate } from '../../types';
 import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
 import { Select } from '../../components/ui/Select';
 import { BranchSelector } from '../../components/ui/BranchSelector';
+
+// Razorpay IFSC API response type
+interface IFSCResponse {
+  BANK: string;
+  BRANCH: string;
+  ADDRESS: string;
+  CITY: string;
+  STATE: string;
+  CONTACT: string;
+  MICR: string;
+  IFSC: string;
+}
 
 interface BankAccountFormProps {
   account?: BankAccount | null;
@@ -21,6 +35,8 @@ const ACCOUNT_TYPES = [
 ];
 
 export function BankAccountForm({ account, onSubmit, onClose, isLoading }: BankAccountFormProps) {
+  const [isLookingUp, setIsLookingUp] = useState(false);
+
   const {
     register,
     handleSubmit,
@@ -46,6 +62,40 @@ export function BankAccountForm({ account, onSubmit, onClose, isLoading }: BankA
   });
 
   const branchIdValue = watch('branch_id');
+  const ifscCodeValue = watch('ifsc_code');
+
+  // Lookup bank details from Razorpay IFSC API
+  const lookupIFSC = async () => {
+    const ifsc = ifscCodeValue?.toUpperCase().trim();
+
+    // Validate IFSC format
+    if (!ifsc || !/^[A-Z]{4}0[A-Z0-9]{6}$/.test(ifsc)) {
+      toast.error('Please enter a valid IFSC code first');
+      return;
+    }
+
+    setIsLookingUp(true);
+    try {
+      const response = await fetch(`https://ifsc.razorpay.com/${ifsc}`);
+
+      if (!response.ok) {
+        throw new Error('Invalid IFSC code or bank not found');
+      }
+
+      const data: IFSCResponse = await response.json();
+
+      // Auto-populate fields
+      setValue('bank_name', data.BANK, { shouldValidate: true });
+      setValue('branch_name', data.BRANCH, { shouldValidate: true });
+
+      toast.success(`Bank details fetched: ${data.BANK} - ${data.BRANCH}`);
+    } catch (error) {
+      console.error('IFSC lookup error:', error);
+      toast.error('Could not fetch bank details. Please enter manually.');
+    } finally {
+      setIsLookingUp(false);
+    }
+  };
 
   const handleFormSubmit = (data: BankAccountCreate) => {
     // Ensure optional fields are properly handled
@@ -98,15 +148,66 @@ export function BankAccountForm({ account, onSubmit, onClose, isLoading }: BankA
 
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
+                IFSC Code *
+              </label>
+              <div className="flex gap-2">
+                <Input
+                  {...register('ifsc_code', {
+                    required: 'IFSC code is required',
+                    pattern: {
+                      value: /^[A-Z]{4}0[A-Z0-9]{6}$/i,
+                      message: 'Invalid IFSC code format (e.g., SBIN0001234)',
+                    },
+                  })}
+                  placeholder="SBIN0001234"
+                  maxLength={11}
+                  className="flex-1 uppercase"
+                  style={{ textTransform: 'uppercase' }}
+                />
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={lookupIFSC}
+                  disabled={isLookingUp}
+                  className="shrink-0"
+                  title="Fetch bank details from IFSC"
+                >
+                  {isLookingUp ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <Search className="h-4 w-4" />
+                  )}
+                </Button>
+              </div>
+              {errors.ifsc_code && (
+                <p className="text-red-500 text-sm mt-1">{errors.ifsc_code.message}</p>
+              )}
+              <p className="text-xs text-gray-500 mt-1">
+                Enter IFSC and click lookup to auto-fetch bank details
+              </p>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
                 Bank Name *
               </label>
               <Input
                 {...register('bank_name', { required: 'Bank name is required' })}
-                placeholder="Enter bank name"
+                placeholder="Auto-filled from IFSC or enter manually"
               />
               {errors.bank_name && (
                 <p className="text-red-500 text-sm mt-1">{errors.bank_name.message}</p>
               )}
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Bank Branch
+              </label>
+              <Input
+                {...register('branch_name')}
+                placeholder="Auto-filled from IFSC or enter manually"
+              />
             </div>
 
             <div>
@@ -120,39 +221,6 @@ export function BankAccountForm({ account, onSubmit, onClose, isLoading }: BankA
               {errors.account_number && (
                 <p className="text-red-500 text-sm mt-1">{errors.account_number.message}</p>
               )}
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                IFSC Code *
-              </label>
-              <Input
-                {...register('ifsc_code', {
-                  required: 'IFSC code is required',
-                  pattern: {
-                    value: /^[A-Z]{4}0[A-Z0-9]{6}$/,
-                    message: 'Invalid IFSC code format (e.g., SBIN0001234)',
-                  },
-                })}
-                placeholder="SBIN0001234"
-                maxLength={11}
-              />
-              {errors.ifsc_code && (
-                <p className="text-red-500 text-sm mt-1">{errors.ifsc_code.message}</p>
-              )}
-              <p className="text-xs text-gray-500 mt-1">
-                Format: Bank Code (4) + 0 + Branch Code (6)
-              </p>
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Bank Branch
-              </label>
-              <Input
-                {...register('branch_name')}
-                placeholder="Enter bank branch name"
-              />
             </div>
 
             <div>

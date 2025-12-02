@@ -105,8 +105,14 @@ async def create_bank_account(
     account = BankAccount(**account_data.model_dump())
     db.add(account)
     await db.commit()
-    await db.refresh(account)
-    return account
+
+    # Reload with branch relationship for response
+    result = await db.execute(
+        select(BankAccount)
+        .options(selectinload(BankAccount.branch))
+        .where(BankAccount.id == account.id)
+    )
+    return result.scalar_one()
 
 
 @router.patch("/{account_id}", response_model=BankAccountResponse)
@@ -151,8 +157,14 @@ async def update_bank_account(
         setattr(account, field, value)
 
     await db.commit()
-    await db.refresh(account)
-    return account
+
+    # Reload with branch relationship for response
+    result = await db.execute(
+        select(BankAccount)
+        .options(selectinload(BankAccount.branch))
+        .where(BankAccount.id == account_id)
+    )
+    return result.scalar_one()
 
 
 @router.patch("/{account_id}/set-default", response_model=BankAccountResponse)
@@ -162,7 +174,11 @@ async def set_default_account(
     current_user: User = Depends(get_current_user),
 ):
     """Set a bank account as the default for its branch."""
-    result = await db.execute(select(BankAccount).where(BankAccount.id == account_id))
+    result = await db.execute(
+        select(BankAccount)
+        .options(selectinload(BankAccount.branch))
+        .where(BankAccount.id == account_id)
+    )
     account = result.scalar_one_or_none()
     if not account:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Bank account not found")
@@ -180,8 +196,14 @@ async def set_default_account(
     # Set this as default
     account.is_default = True
     await db.commit()
-    await db.refresh(account)
-    return account
+
+    # Reload with branch relationship for response
+    result = await db.execute(
+        select(BankAccount)
+        .options(selectinload(BankAccount.branch))
+        .where(BankAccount.id == account_id)
+    )
+    return result.scalar_one()
 
 
 @router.delete("/{account_id}", response_model=Message)

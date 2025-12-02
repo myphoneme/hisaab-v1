@@ -54,17 +54,26 @@ class BankAccountUpdate(BaseModel):
     is_default: Optional[bool] = None
 
 
+class BranchInfo(BaseModel):
+    """Minimal branch info for bank account response."""
+    id: int
+    branch_name: str
+    branch_code: str
+
+    class Config:
+        from_attributes = True
+
+
 class BankAccountResponse(BankAccountBase):
     id: int
     created_at: datetime
     updated_at: datetime
+    branch: Optional[BranchInfo] = None  # Include organization branch info
 
     class Config:
         from_attributes = True
 
 
 class BankAccountWithBranch(BankAccountResponse):
-    branch: Optional[dict] = None
-
-    class Config:
-        from_attributes = True
+    """Alias for backward compatibility."""
+    pass

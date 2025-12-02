@@ -35,7 +35,7 @@ function formatErrorMessage(error: any): string {
 
 export function Settings() {
   const queryClient = useQueryClient();
-  const [activeTab, setActiveTab] = useState<'company' | 'tax' | 'bank' | 'preferences' | 'ledger'>('company');
+  const [activeTab, setActiveTab] = useState<'company' | 'tax' | 'preferences' | 'ledger'>('company');
 
   const { data: settings, isLoading, error, isError } = useQuery<CompanySettings>({
     queryKey: ['settings'],
@@ -165,7 +165,6 @@ export function Settings() {
           {[
             { id: 'company', label: 'Company Info' },
             { id: 'tax', label: 'Tax Details' },
-            { id: 'bank', label: 'Bank Details' },
             { id: 'preferences', label: 'Preferences' },
             { id: 'ledger', label: 'Ledger Posting' },
           ].map((tab) => (
@@ -276,19 +275,6 @@ export function Settings() {
                     onChange={(e) => handleChange('website', e.target.value)}
                   />
                 </div>
-              </div>
-            )}
-
-            {activeTab === 'tax' && (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">GSTIN</label>
-                  <Input
-                    value={currentData.gstin || ''}
-                    onChange={(e) => handleChange('gstin', e.target.value)}
-                    maxLength={15}
-                  />
-                </div>
 
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">PAN *</label>
@@ -298,6 +284,25 @@ export function Settings() {
                     maxLength={10}
                     required
                   />
+                  <p className="text-xs text-gray-500 mt-1">
+                    Company's PAN (unique for all branches)
+                  </p>
+                </div>
+              </div>
+            )}
+
+            {activeTab === 'tax' && (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Primary GSTIN</label>
+                  <Input
+                    value={currentData.gstin || ''}
+                    onChange={(e) => handleChange('gstin', e.target.value)}
+                    maxLength={15}
+                  />
+                  <p className="text-xs text-gray-500 mt-1">
+                    Company's primary GSTIN. Branch-specific GSTINs are managed in Branches.
+                  </p>
                 </div>
 
                 <div>
@@ -316,61 +321,6 @@ export function Settings() {
                     onChange={(e) => handleChange('cin', e.target.value)}
                     maxLength={21}
                   />
-                </div>
-              </div>
-            )}
-
-            {activeTab === 'bank' && (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Bank Name</label>
-                  <Input
-                    value={currentData.bank_name || ''}
-                    onChange={(e) => handleChange('bank_name', e.target.value)}
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Account Number
-                  </label>
-                  <Input
-                    value={currentData.bank_account_number || ''}
-                    onChange={(e) => handleChange('bank_account_number', e.target.value)}
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">IFSC Code</label>
-                  <Input
-                    value={currentData.bank_ifsc || ''}
-                    onChange={(e) => handleChange('bank_ifsc', e.target.value)}
-                    maxLength={11}
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Branch</label>
-                  <Input
-                    value={currentData.bank_branch || ''}
-                    onChange={(e) => handleChange('bank_branch', e.target.value)}
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Account Type
-                  </label>
-                  <select
-                    className="w-full border border-gray-300 rounded-md px-3 py-2"
-                    value={currentData.bank_account_type || ''}
-                    onChange={(e) => handleChange('bank_account_type', e.target.value)}
-                  >
-                    <option value="">Select Type</option>
-                    <option value="SAVINGS">Savings</option>
-                    <option value="CURRENT">Current</option>
-                    <option value="OD">Overdraft</option>
-                  </select>
                 </div>
               </div>
             )}
