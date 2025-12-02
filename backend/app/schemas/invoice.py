@@ -116,6 +116,7 @@ class InvoiceResponse(InvoiceBase):
     ack_number: Optional[str]
     ack_date: Optional[date]
     status: InvoiceStatus
+    is_posted: bool = False
     items: List[InvoiceItemResponse]
     client: Optional[ClientResponse] = None
     vendor: Optional[VendorResponse] = None

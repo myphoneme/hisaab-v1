@@ -1,4 +1,4 @@
-from sqlalchemy import Column, String, Integer, Numeric, Date, ForeignKey, Text, Enum, Boolean
+from sqlalchemy import Column, String, Integer, Numeric, Date, ForeignKey, Text, Boolean
 from sqlalchemy.orm import relationship
 import enum
 
@@ -53,8 +53,8 @@ class ChartOfAccount(BaseModel):
 
     code = Column(String(20), unique=True, nullable=False, index=True)
     name = Column(String(255), nullable=False)
-    account_type = Column(Enum(AccountType), nullable=False)
-    account_group = Column(Enum(AccountGroup), nullable=False)
+    account_type = Column(String(20), nullable=False)
+    account_group = Column(String(30), nullable=False)
     parent_id = Column(Integer, ForeignKey("chart_of_accounts.id"), nullable=True)
     description = Column(Text, nullable=True)
     is_active = Column(Boolean, default=True, nullable=False)
@@ -76,7 +76,7 @@ class LedgerEntry(BaseModel):
     credit = Column(Numeric(15, 2), default=0, nullable=False)
 
     # Reference
-    reference_type = Column(Enum(ReferenceType), nullable=False)
+    reference_type = Column(String(20), nullable=False)
     reference_id = Column(Integer, nullable=True)  # ID of invoice/payment/journal
 
     # Description

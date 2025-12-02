@@ -15,6 +15,10 @@ from app.schemas.invoice import InvoiceCreate, InvoiceUpdate, InvoiceResponse, I
 from app.schemas.common import PaginatedResponse, Message
 from app.core.security import get_current_user
 from app.services.number_generator import generate_invoice_number
+from app.services.ledger_posting import (
+    post_invoice, reverse_invoice_posting, get_company_settings,
+    should_post_on_create, should_post_on_send
+)
 
 router = APIRouter()
 
@@ -176,6 +180,7 @@ async def create_invoice(
         invoice_type=invoice_data.invoice_type,
         client_id=invoice_data.client_id,
         vendor_id=invoice_data.vendor_id,
+        branch_id=invoice_data.branch_id,
         po_id=invoice_data.po_id,
         place_of_supply=invoice_data.place_of_supply,
         place_of_supply_code=invoice_data.place_of_supply_code,
@@ -191,6 +196,7 @@ async def create_invoice(
         notes=invoice_data.notes,
         terms_conditions=invoice_data.terms_conditions,
         status=InvoiceStatus.DRAFT,
+        is_posted=False,
     )
 
     # Calculate item amounts
@@ -249,6 +255,17 @@ async def create_invoice(
     db.add(invoice)
     await db.commit()
     await db.refresh(invoice)
+
+    # Post ledger entries if configured for ON_CREATE
+    if await should_post_on_create(db):
+        settings = await get_company_settings(db)
+        if settings:
+            try:
+                await post_invoice(db, invoice, settings)
+                await db.commit()
+            except Exception as e:
+                # Log error but don't fail the invoice creation
+                pass
 
     # Reload with relationships
     result = await db.execute(
@@ -387,7 +404,33 @@ async def update_invoice_status(
     if not invoice:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Invoice not found")
 
+    old_status = invoice.status
     invoice.status = status_update
+
+    # Handle ledger posting based on status change
+    settings = await get_company_settings(db)
+
+    # Post ledger when status changes to SENT (if configured for ON_SENT)
+    if (status_update == InvoiceStatus.SENT and
+        old_status == InvoiceStatus.DRAFT and
+        not invoice.is_posted and
+        await should_post_on_send(db)):
+        if settings:
+            try:
+                await post_invoice(db, invoice, settings)
+            except Exception as e:
+                # Log error but continue with status update
+                pass
+
+    # Reverse ledger posting when cancelled
+    if status_update == InvoiceStatus.CANCELLED and invoice.is_posted:
+        if settings:
+            try:
+                await reverse_invoice_posting(db, invoice, settings)
+            except Exception as e:
+                # Log error but continue with status update
+                pass
+
     await db.commit()
     await db.refresh(invoice)
 

@@ -35,7 +35,7 @@ function formatErrorMessage(error: any): string {
 
 export function Settings() {
   const queryClient = useQueryClient();
-  const [activeTab, setActiveTab] = useState<'company' | 'tax' | 'bank' | 'preferences'>('company');
+  const [activeTab, setActiveTab] = useState<'company' | 'tax' | 'bank' | 'preferences' | 'ledger'>('company');
 
   const { data: settings, isLoading, error, isError } = useQuery<CompanySettings>({
     queryKey: ['settings'],
@@ -167,6 +167,7 @@ export function Settings() {
             { id: 'tax', label: 'Tax Details' },
             { id: 'bank', label: 'Bank Details' },
             { id: 'preferences', label: 'Preferences' },
+            { id: 'ledger', label: 'Ledger Posting' },
           ].map((tab) => (
             <button
               key={tab.id}
@@ -445,6 +446,82 @@ export function Settings() {
                     value={currentData.invoice_notes || ''}
                     onChange={(e) => handleChange('invoice_notes', e.target.value)}
                   />
+                </div>
+              </div>
+            )}
+
+            {activeTab === 'ledger' && (
+              <div className="space-y-6">
+                <div>
+                  <h3 className="text-lg font-medium text-gray-900 mb-4">Ledger Posting Configuration</h3>
+                  <p className="text-sm text-gray-500 mb-4">
+                    Configure when ledger entries should be automatically created from invoices and payments.
+                  </p>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="md:col-span-2">
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Create Ledger Entries
+                    </label>
+                    <select
+                      className="w-full border border-gray-300 rounded-md px-3 py-2"
+                      value={currentData.ledger_posting_on || 'ON_SENT'}
+                      onChange={(e) => handleChange('ledger_posting_on', e.target.value)}
+                    >
+                      <option value="ON_CREATE">On Create - Post ledger when invoice/payment is created</option>
+                      <option value="ON_SENT">On Send - Post ledger when invoice is marked as Sent</option>
+                    </select>
+                    <p className="text-xs text-gray-500 mt-1">
+                      "On Send" is recommended for most businesses as it allows draft invoices without affecting ledger.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="border-t pt-6 mt-6">
+                  <h4 className="text-md font-medium text-gray-900 mb-4">Default GL Accounts</h4>
+                  <p className="text-sm text-gray-500 mb-4">
+                    These accounts are used for automatic ledger posting. They are configured when you seed default accounts.
+                  </p>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="bg-gray-50 p-3 rounded">
+                      <span className="text-sm font-medium">Sales Account:</span>
+                      <span className="text-sm text-gray-600 ml-2">
+                        {currentData.default_sales_account_id ? `ID: ${currentData.default_sales_account_id}` : 'Not configured'}
+                      </span>
+                    </div>
+                    <div className="bg-gray-50 p-3 rounded">
+                      <span className="text-sm font-medium">Purchase Account:</span>
+                      <span className="text-sm text-gray-600 ml-2">
+                        {currentData.default_purchase_account_id ? `ID: ${currentData.default_purchase_account_id}` : 'Not configured'}
+                      </span>
+                    </div>
+                    <div className="bg-gray-50 p-3 rounded">
+                      <span className="text-sm font-medium">Accounts Receivable:</span>
+                      <span className="text-sm text-gray-600 ml-2">
+                        {currentData.default_ar_account_id ? `ID: ${currentData.default_ar_account_id}` : 'Not configured'}
+                      </span>
+                    </div>
+                    <div className="bg-gray-50 p-3 rounded">
+                      <span className="text-sm font-medium">Accounts Payable:</span>
+                      <span className="text-sm text-gray-600 ml-2">
+                        {currentData.default_ap_account_id ? `ID: ${currentData.default_ap_account_id}` : 'Not configured'}
+                      </span>
+                    </div>
+                    <div className="bg-gray-50 p-3 rounded">
+                      <span className="text-sm font-medium">Cash Account:</span>
+                      <span className="text-sm text-gray-600 ml-2">
+                        {currentData.default_cash_account_id ? `ID: ${currentData.default_cash_account_id}` : 'Not configured'}
+                      </span>
+                    </div>
+                    <div className="bg-gray-50 p-3 rounded">
+                      <span className="text-sm font-medium">Bank Account:</span>
+                      <span className="text-sm text-gray-600 ml-2">
+                        {currentData.default_bank_account_id ? `ID: ${currentData.default_bank_account_id}` : 'Not configured'}
+                      </span>
+                    </div>
+                  </div>
                 </div>
               </div>
             )}

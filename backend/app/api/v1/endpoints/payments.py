@@ -14,6 +14,9 @@ from app.schemas.payment import PaymentCreate, PaymentUpdate, PaymentResponse
 from app.schemas.common import PaginatedResponse, Message
 from app.core.security import get_current_user
 from app.services.number_generator import generate_payment_number
+from app.services.ledger_posting import (
+    post_payment, reverse_payment_posting, get_company_settings
+)
 
 router = APIRouter()
 
@@ -129,6 +132,7 @@ async def create_payment(
         cheque_date=payment_data.cheque_date,
         notes=payment_data.notes,
         status=PaymentStatus.COMPLETED,
+        is_posted=False,
     )
 
     db.add(payment)
@@ -148,6 +152,16 @@ async def create_payment(
 
     await db.commit()
     await db.refresh(payment)
+
+    # Post ledger entries for payment (payments are always posted immediately)
+    settings = await get_company_settings(db)
+    if settings:
+        try:
+            await post_payment(db, payment, settings)
+            await db.commit()
+        except Exception as e:
+            # Log error but don't fail the payment creation
+            pass
 
     # Reload with relationships
     result = await db.execute(
@@ -268,6 +282,16 @@ async def delete_payment(
     payment = result.scalar_one_or_none()
     if not payment:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Payment not found")
+
+    # Reverse ledger posting if posted
+    if payment.is_posted:
+        settings = await get_company_settings(db)
+        if settings:
+            try:
+                await reverse_payment_posting(db, payment, settings)
+            except Exception as e:
+                # Log error but continue with deletion
+                pass
 
     # Reverse invoice update if linked
     if payment.invoice_id:

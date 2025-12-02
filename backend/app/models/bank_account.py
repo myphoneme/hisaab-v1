@@ -1,4 +1,4 @@
-from sqlalchemy import Column, String, Boolean, Integer, ForeignKey, Enum
+from sqlalchemy import Column, String, Boolean, Integer, ForeignKey
 from sqlalchemy.orm import relationship
 import enum
 
@@ -24,7 +24,7 @@ class BankAccount(BaseModel):
     account_number = Column(String(50), nullable=False)
     ifsc_code = Column(String(11), nullable=False)
     branch_name = Column(String(255), nullable=True)  # Bank branch name
-    account_type = Column(Enum(AccountType), default=AccountType.CURRENT, nullable=False)
+    account_type = Column(String(20), default="CURRENT", nullable=False)
 
     # Additional Details
     upi_id = Column(String(100), nullable=True)

@@ -157,6 +157,7 @@ export const ledgerApi = {
   createAccount: (data: unknown) => api.post<ChartOfAccount>('/ledger/accounts', data),
   updateAccount: (id: number, data: unknown) => api.patch<ChartOfAccount>(`/ledger/accounts/${id}`, data),
   deleteAccount: (id: number) => api.delete<{ message: string }>(`/ledger/accounts/${id}`),
+  seedAccounts: () => api.post<{ message: string }>('/ledger/accounts/seed'),
   // Ledger Entries
   getEntries: (params?: Record<string, unknown>) => api.get<PaginatedResponse<LedgerEntry>>('/ledger/entries', params),
   createJournalEntry: (data: unknown) => api.post<LedgerEntry>('/ledger/journal-entry', data),

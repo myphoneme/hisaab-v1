@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
-import { Plus, BookOpen } from 'lucide-react';
+import { Plus, BookOpen, Database } from 'lucide-react';
 import { Card, CardContent, CardHeader } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
 import { ledgerApi } from '../../services/api';
@@ -52,6 +52,19 @@ export function Ledger() {
     },
   });
 
+  // Seed accounts mutation
+  const seedAccountsMutation = useMutation({
+    mutationFn: () => ledgerApi.seedAccounts(),
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ['chart-of-accounts'] });
+      toast.success(data.message);
+    },
+    onError: (error: any) => {
+      const errorMessage = error.response?.data?.detail || 'Failed to seed accounts';
+      toast.error(errorMessage);
+    },
+  });
+
   // Group accounts by type
   const groupedAccounts = accounts?.reduce((acc, account) => {
     if (!acc[account.account_type]) {
@@ -68,16 +81,26 @@ export function Ledger() {
           <h1 className="text-2xl font-bold text-gray-900">Ledger & Accounts</h1>
           <p className="text-gray-500 mt-1">Chart of accounts and trial balance</p>
         </div>
-        <Button
-          variant="outline"
-          onClick={() => {
-            setSelectedAccount(null);
-            setShowAccountForm(true);
-          }}
-        >
-          <Plus className="h-4 w-4 mr-2" />
-          New Account
-        </Button>
+        <div className="flex gap-2">
+          <Button
+            variant="outline"
+            onClick={() => seedAccountsMutation.mutate()}
+            disabled={seedAccountsMutation.isPending}
+          >
+            <Database className="h-4 w-4 mr-2" />
+            {seedAccountsMutation.isPending ? 'Seeding...' : 'Seed Default Accounts'}
+          </Button>
+          <Button
+            variant="outline"
+            onClick={() => {
+              setSelectedAccount(null);
+              setShowAccountForm(true);
+            }}
+          >
+            <Plus className="h-4 w-4 mr-2" />
+            New Account
+          </Button>
+        </div>
       </div>
 
       {/* Tabs */}

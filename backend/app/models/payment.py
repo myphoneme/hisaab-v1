@@ -1,4 +1,4 @@
-from sqlalchemy import Column, String, Integer, Numeric, Date, ForeignKey, Text, Enum
+from sqlalchemy import Column, String, Integer, Numeric, Date, ForeignKey, Text, Enum, Boolean
 from sqlalchemy.orm import relationship
 import enum
 
@@ -66,6 +66,9 @@ class Payment(BaseModel):
 
     # Status
     status = Column(Enum(PaymentStatus), default=PaymentStatus.COMPLETED, nullable=False)
+
+    # Ledger Posting
+    is_posted = Column(Boolean, default=False, nullable=False)  # Track if ledger entries created
 
     # Additional Info
     notes = Column(Text, nullable=True)

@@ -53,6 +53,7 @@ class PaymentResponse(PaymentBase):
     payment_number: str
     net_amount: Decimal
     status: PaymentStatus
+    is_posted: bool = False
     client: Optional[ClientResponse] = None
     vendor: Optional[VendorResponse] = None
     branch: Optional[BranchResponse] = None

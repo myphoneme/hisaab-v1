@@ -1,6 +1,6 @@
 from pydantic import BaseModel, Field
 from typing import Optional
-from datetime import date
+from datetime import date, datetime
 from decimal import Decimal
 
 
@@ -28,8 +28,8 @@ class ChartOfAccountUpdate(BaseModel):
 class ChartOfAccountResponse(ChartOfAccountBase):
     id: int
     is_system: bool
-    created_at: str
-    updated_at: str
+    created_at: datetime
+    updated_at: datetime
 
     class Config:
         from_attributes = True
@@ -58,8 +58,8 @@ class LedgerEntryResponse(LedgerEntryBase):
     reference_type: str
     reference_id: Optional[int] = None
     financial_year: str
-    created_at: str
-    updated_at: str
+    created_at: datetime
+    updated_at: datetime
 
     class Config:
         from_attributes = True

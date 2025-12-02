@@ -293,6 +293,7 @@ export interface Invoice extends BaseEntity {
   irn: string | null;
   ack_number: string | null;
   ack_date: string | null;
+  is_posted: boolean;
 }
 
 // Payment Types
@@ -318,6 +319,7 @@ export interface Payment extends BaseEntity {
   reference_number: string | null;
   notes: string | null;
   status: 'PENDING' | 'COMPLETED' | 'CANCELLED';
+  is_posted: boolean;
 }
 
 export interface PaymentCreate {
@@ -496,6 +498,23 @@ export interface CompanySettings extends BaseEntity {
   enable_multi_currency: boolean;
   enable_inventory: boolean;
   is_active: boolean;
+  // Ledger Posting Settings
+  ledger_posting_on: 'ON_CREATE' | 'ON_SENT';
+  default_sales_account_id: number | null;
+  default_purchase_account_id: number | null;
+  default_ar_account_id: number | null;
+  default_ap_account_id: number | null;
+  default_cash_account_id: number | null;
+  default_bank_account_id: number | null;
+  default_cgst_output_account_id: number | null;
+  default_sgst_output_account_id: number | null;
+  default_igst_output_account_id: number | null;
+  default_cgst_input_account_id: number | null;
+  default_sgst_input_account_id: number | null;
+  default_igst_input_account_id: number | null;
+  default_tds_receivable_account_id: number | null;
+  default_tds_payable_account_id: number | null;
+  default_round_off_account_id: number | null;
 }
 
 export interface CompanySettingsUpdate {
@@ -529,4 +548,21 @@ export interface CompanySettingsUpdate {
   invoice_notes?: string;
   enable_multi_currency?: boolean;
   enable_inventory?: boolean;
+  // Ledger Posting Settings
+  ledger_posting_on?: 'ON_CREATE' | 'ON_SENT';
+  default_sales_account_id?: number;
+  default_purchase_account_id?: number;
+  default_ar_account_id?: number;
+  default_ap_account_id?: number;
+  default_cash_account_id?: number;
+  default_bank_account_id?: number;
+  default_cgst_output_account_id?: number;
+  default_sgst_output_account_id?: number;
+  default_igst_output_account_id?: number;
+  default_cgst_input_account_id?: number;
+  default_sgst_input_account_id?: number;
+  default_igst_input_account_id?: number;
+  default_tds_receivable_account_id?: number;
+  default_tds_payable_account_id?: number;
+  default_round_off_account_id?: number;
 }

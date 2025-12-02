@@ -29,11 +29,26 @@ from app.schemas.ledger import (
 from app.schemas.common import PaginatedResponse, Message
 from app.core.security import get_current_user
 from app.services.number_generator import generate_voucher_number
+from app.services.chart_of_accounts_seeder import seed_default_accounts, check_accounts_seeded
 
 router = APIRouter()
 
 
 # Chart of Accounts Endpoints
+@router.post("/accounts/seed", response_model=Message)
+async def seed_accounts(
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Seed default chart of accounts."""
+    is_seeded = await check_accounts_seeded(db)
+    if is_seeded:
+        return Message(message="Default accounts already exist")
+
+    await seed_default_accounts(db)
+    return Message(message="Default accounts seeded successfully")
+
+
 @router.get("/accounts", response_model=PaginatedResponse[ChartOfAccountResponse])
 async def get_accounts(
     page: int = Query(1, ge=1),

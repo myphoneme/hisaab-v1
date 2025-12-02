@@ -52,6 +52,26 @@ class CompanySettingsBase(BaseModel):
     enable_multi_currency: bool = False
     enable_inventory: bool = False
 
+    # Ledger Posting Settings
+    ledger_posting_on: str = Field(default="ON_SENT", max_length=20)  # ON_CREATE or ON_SENT
+
+    # Default GL Account IDs
+    default_sales_account_id: Optional[int] = None
+    default_purchase_account_id: Optional[int] = None
+    default_ar_account_id: Optional[int] = None
+    default_ap_account_id: Optional[int] = None
+    default_cash_account_id: Optional[int] = None
+    default_bank_account_id: Optional[int] = None
+    default_cgst_output_account_id: Optional[int] = None
+    default_sgst_output_account_id: Optional[int] = None
+    default_igst_output_account_id: Optional[int] = None
+    default_cgst_input_account_id: Optional[int] = None
+    default_sgst_input_account_id: Optional[int] = None
+    default_igst_input_account_id: Optional[int] = None
+    default_tds_receivable_account_id: Optional[int] = None
+    default_tds_payable_account_id: Optional[int] = None
+    default_round_off_account_id: Optional[int] = None
+
 
 class CompanySettingsCreate(CompanySettingsBase):
     pass
@@ -89,6 +109,23 @@ class CompanySettingsUpdate(BaseModel):
     invoice_notes: Optional[str] = None
     enable_multi_currency: Optional[bool] = None
     enable_inventory: Optional[bool] = None
+    # Ledger Posting Settings
+    ledger_posting_on: Optional[str] = Field(None, max_length=20)
+    default_sales_account_id: Optional[int] = None
+    default_purchase_account_id: Optional[int] = None
+    default_ar_account_id: Optional[int] = None
+    default_ap_account_id: Optional[int] = None
+    default_cash_account_id: Optional[int] = None
+    default_bank_account_id: Optional[int] = None
+    default_cgst_output_account_id: Optional[int] = None
+    default_sgst_output_account_id: Optional[int] = None
+    default_igst_output_account_id: Optional[int] = None
+    default_cgst_input_account_id: Optional[int] = None
+    default_sgst_input_account_id: Optional[int] = None
+    default_igst_input_account_id: Optional[int] = None
+    default_tds_receivable_account_id: Optional[int] = None
+    default_tds_payable_account_id: Optional[int] = None
+    default_round_off_account_id: Optional[int] = None
 
 
 class CompanySettingsResponse(CompanySettingsBase):

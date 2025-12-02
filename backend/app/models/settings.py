@@ -1,4 +1,5 @@
-from sqlalchemy import Column, String, Text, Boolean, Integer
+from sqlalchemy import Column, String, Text, Boolean, Integer, ForeignKey
+from sqlalchemy.orm import relationship
 from app.models.base import BaseModel
 
 
@@ -52,6 +53,26 @@ class CompanySettings(BaseModel):
     # System Settings
     enable_multi_currency = Column(Boolean, default=False, nullable=False)
     enable_inventory = Column(Boolean, default=False, nullable=False)
+
+    # Ledger Posting Settings
+    ledger_posting_on = Column(String(20), default="ON_SENT", nullable=False)  # ON_CREATE or ON_SENT
+
+    # Default GL Account IDs (Foreign Keys to ChartOfAccount)
+    default_sales_account_id = Column(Integer, ForeignKey("chart_of_accounts.id", ondelete="SET NULL"), nullable=True)
+    default_purchase_account_id = Column(Integer, ForeignKey("chart_of_accounts.id", ondelete="SET NULL"), nullable=True)
+    default_ar_account_id = Column(Integer, ForeignKey("chart_of_accounts.id", ondelete="SET NULL"), nullable=True)
+    default_ap_account_id = Column(Integer, ForeignKey("chart_of_accounts.id", ondelete="SET NULL"), nullable=True)
+    default_cash_account_id = Column(Integer, ForeignKey("chart_of_accounts.id", ondelete="SET NULL"), nullable=True)
+    default_bank_account_id = Column(Integer, ForeignKey("chart_of_accounts.id", ondelete="SET NULL"), nullable=True)
+    default_cgst_output_account_id = Column(Integer, ForeignKey("chart_of_accounts.id", ondelete="SET NULL"), nullable=True)
+    default_sgst_output_account_id = Column(Integer, ForeignKey("chart_of_accounts.id", ondelete="SET NULL"), nullable=True)
+    default_igst_output_account_id = Column(Integer, ForeignKey("chart_of_accounts.id", ondelete="SET NULL"), nullable=True)
+    default_cgst_input_account_id = Column(Integer, ForeignKey("chart_of_accounts.id", ondelete="SET NULL"), nullable=True)
+    default_sgst_input_account_id = Column(Integer, ForeignKey("chart_of_accounts.id", ondelete="SET NULL"), nullable=True)
+    default_igst_input_account_id = Column(Integer, ForeignKey("chart_of_accounts.id", ondelete="SET NULL"), nullable=True)
+    default_tds_receivable_account_id = Column(Integer, ForeignKey("chart_of_accounts.id", ondelete="SET NULL"), nullable=True)
+    default_tds_payable_account_id = Column(Integer, ForeignKey("chart_of_accounts.id", ondelete="SET NULL"), nullable=True)
+    default_round_off_account_id = Column(Integer, ForeignKey("chart_of_accounts.id", ondelete="SET NULL"), nullable=True)
 
     # Only one company settings record should exist
     is_active = Column(Boolean, default=True, nullable=False)

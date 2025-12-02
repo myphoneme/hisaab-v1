@@ -85,6 +85,9 @@ class Invoice(BaseModel):
     # Status
     status = Column(Enum(InvoiceStatus), default=InvoiceStatus.DRAFT, nullable=False)
 
+    # Ledger Posting
+    is_posted = Column(Boolean, default=False, nullable=False)  # Track if ledger entries created
+
     # Additional Info
     notes = Column(Text, nullable=True)
     terms_conditions = Column(Text, nullable=True)
