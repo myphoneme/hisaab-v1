@@ -99,6 +99,7 @@ class Invoice(BaseModel):
     purchase_order = relationship("PurchaseOrder", back_populates="invoices")
     items = relationship("InvoiceItem", back_populates="invoice", cascade="all, delete-orphan")
     payments = relationship("Payment", back_populates="invoice")
+    attachments = relationship("InvoiceAttachment", back_populates="invoice", cascade="all, delete-orphan")
 
 
 class InvoiceItem(BaseModel):

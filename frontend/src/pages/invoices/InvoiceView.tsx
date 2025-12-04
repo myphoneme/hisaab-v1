@@ -1,13 +1,14 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Edit, Printer, Send, XCircle } from 'lucide-react';
+import { ArrowLeft, Edit, Printer, Send, XCircle, Paperclip } from 'lucide-react';
 import { useState } from 'react';
 import { toast } from 'sonner';
-import { invoiceApi, settingsApi, paymentApi } from '../../services/api';
+import { invoiceApi, settingsApi, paymentApi, invoiceAttachmentApi } from '../../services/api';
 import { Button } from '../../components/ui/Button';
 import { Card, CardContent, CardHeader } from '../../components/ui/Card';
+import { AttachmentList } from '../../components/invoices/AttachmentList';
 import { formatCurrency } from '../../lib/utils';
-import type { Invoice, CompanySettings, Payment } from '../../types';
+import type { Invoice, CompanySettings, Payment, InvoiceAttachment } from '../../types';
 
 export function InvoiceView() {
   const { id } = useParams<{ id: string }>();
@@ -80,6 +81,26 @@ export function InvoiceView() {
   });
 
   const payments = paymentsData as Payment[] | undefined;
+
+  // Fetch attachments for this invoice
+  const { data: attachmentsData } = useQuery({
+    queryKey: ['invoice-attachments', id],
+    queryFn: async () => {
+      const response = await invoiceAttachmentApi.list(Number(id));
+      return response;
+    },
+    enabled: !!id,
+  });
+
+  const attachments = (attachmentsData as { attachments: InvoiceAttachment[] })?.attachments || [];
+
+  const handleDownloadAttachment = async (attachment: InvoiceAttachment) => {
+    try {
+      await invoiceAttachmentApi.download(Number(id), attachment.id, attachment.filename);
+    } catch {
+      toast.error('Failed to download file');
+    }
+  };
 
   const handlePrint = () => {
     window.print();
@@ -425,6 +446,21 @@ export function InvoiceView() {
                   </div>
                 ))}
               </div>
+            </div>
+          )}
+
+          {/* Attachments */}
+          {attachments.length > 0 && (
+            <div className="mt-8 pt-6 border-t no-print">
+              <h3 className="text-lg font-semibold mb-3 flex items-center gap-2">
+                <Paperclip className="h-5 w-5" />
+                Attachments ({attachments.length})
+              </h3>
+              <AttachmentList
+                attachments={attachments}
+                onDownload={handleDownloadAttachment}
+                canDelete={false}
+              />
             </div>
           )}
 

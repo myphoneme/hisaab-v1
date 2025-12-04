@@ -15,6 +15,9 @@ import type {
   LedgerEntry,
   LedgerStatement,
   TrialBalance,
+  ExpenseCategory,
+  Project,
+  CashExpense,
 } from '../types';
 
 const API_BASE_URL = '/api/v1';
@@ -293,4 +296,87 @@ export const authApi = {
   register: (data: unknown) => api.post('/auth/register', data),
   me: () => api.get('/auth/me'),
   logout: () => api.post('/auth/logout'),
+};
+
+// Invoice Attachment API
+export const invoiceAttachmentApi = {
+  upload: async (invoiceId: number, files: File[], description?: string) => {
+    const formData = new FormData();
+    files.forEach(file => formData.append('files', file));
+    if (description) formData.append('description', description);
+
+    const token = localStorage.getItem('access_token');
+    const response = await fetch(`/api/v1/invoices/${invoiceId}/attachments`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+      },
+      body: formData,
+    });
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.detail || 'Failed to upload files');
+    }
+    return response.json();
+  },
+
+  list: (invoiceId: number) =>
+    api.get(`/invoices/${invoiceId}/attachments`),
+
+  get: (invoiceId: number, attachmentId: number) =>
+    api.get(`/invoices/${invoiceId}/attachments/${attachmentId}`),
+
+  download: async (invoiceId: number, attachmentId: number, filename: string) => {
+    const token = localStorage.getItem('access_token');
+    const response = await fetch(
+      `/api/v1/invoices/${invoiceId}/attachments/${attachmentId}/download`,
+      {
+        headers: { 'Authorization': `Bearer ${token}` },
+      }
+    );
+    if (!response.ok) throw new Error('Failed to download file');
+    const blob = await response.blob();
+
+    // Trigger browser download
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    window.URL.revokeObjectURL(url);
+  },
+
+  delete: (invoiceId: number, attachmentId: number) =>
+    api.delete(`/invoices/${invoiceId}/attachments/${attachmentId}`),
+};
+
+// Expense Category API
+export const expenseCategoryApi = {
+  getAll: (params?: Record<string, unknown>) => api.get<PaginatedResponse<ExpenseCategory>>('/expense-categories', params),
+  getActive: () => api.get<ExpenseCategory[]>('/expense-categories/active'),
+  getById: (id: number) => api.get<ExpenseCategory>(`/expense-categories/${id}`),
+  create: (data: unknown) => api.post<ExpenseCategory>('/expense-categories', data),
+  update: (id: number, data: unknown) => api.patch<ExpenseCategory>(`/expense-categories/${id}`, data),
+  delete: (id: number) => api.delete<{ message: string }>(`/expense-categories/${id}`),
+};
+
+// Project API
+export const projectApi = {
+  getAll: (params?: Record<string, unknown>) => api.get<PaginatedResponse<Project>>('/projects', params),
+  getActive: () => api.get<Project[]>('/projects/active'),
+  getById: (id: number) => api.get<Project>(`/projects/${id}`),
+  create: (data: unknown) => api.post<Project>('/projects', data),
+  update: (id: number, data: unknown) => api.patch<Project>(`/projects/${id}`, data),
+  delete: (id: number) => api.delete<{ message: string }>(`/projects/${id}`),
+};
+
+// Cash Expense API
+export const cashExpenseApi = {
+  getAll: (params?: Record<string, unknown>) => api.get<PaginatedResponse<CashExpense>>('/cash-expenses', params),
+  getById: (id: number) => api.get<CashExpense>(`/cash-expenses/${id}`),
+  create: (data: unknown) => api.post<CashExpense>('/cash-expenses', data),
+  update: (id: number, data: unknown) => api.patch<CashExpense>(`/cash-expenses/${id}`, data),
+  delete: (id: number) => api.delete<{ message: string }>(`/cash-expenses/${id}`),
 };

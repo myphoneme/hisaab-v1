@@ -294,6 +294,28 @@ export interface Invoice extends BaseEntity {
   ack_number: string | null;
   ack_date: string | null;
   is_posted: boolean;
+  attachments?: InvoiceAttachment[];
+}
+
+// Invoice Attachment Types
+export interface InvoiceAttachment {
+  id: number;
+  invoice_id: number;
+  filename: string;
+  file_size: number;
+  mime_type: string;
+  description: string | null;
+  created_at: string;
+}
+
+export interface InvoiceAttachmentUploadResponse {
+  message: string;
+  attachments: InvoiceAttachment[];
+}
+
+export interface InvoiceAttachmentListResponse {
+  attachments: InvoiceAttachment[];
+  total: number;
 }
 
 // Payment Types
@@ -400,6 +422,75 @@ export interface TrialBalance {
   accounts: TrialBalanceItem[];
   total_debit: number;
   total_credit: number;
+}
+
+// Expense Category Types
+export interface ExpenseCategory extends BaseEntity {
+  name: string;
+  code: string | null;
+  description: string | null;
+  is_active: boolean;
+}
+
+export interface ExpenseCategoryCreate {
+  name: string;
+  code?: string;
+  description?: string;
+  is_active?: boolean;
+}
+
+// Project Types
+export interface Project extends BaseEntity {
+  name: string;
+  code: string | null;
+  description: string | null;
+  start_date: string | null;
+  end_date: string | null;
+  budget: number | null;
+  is_active: boolean;
+  status: 'ACTIVE' | 'COMPLETED' | 'ON_HOLD' | 'CANCELLED';
+}
+
+export interface ProjectCreate {
+  name: string;
+  code?: string;
+  description?: string;
+  start_date?: string;
+  end_date?: string;
+  budget?: number;
+  is_active?: boolean;
+  status?: 'ACTIVE' | 'COMPLETED' | 'ON_HOLD' | 'CANCELLED';
+}
+
+// Cash Expense Types
+export interface CashExpense extends BaseEntity {
+  expense_number: string;
+  transaction_date: string;
+  expense_category_id: number | null;
+  expense_category?: ExpenseCategory;
+  bank_account_id: number;
+  bank_account?: BankAccount;
+  project_id: number | null;
+  project?: Project;
+  branch_id: number | null;
+  branch?: Branch;
+  amount: number;
+  transaction_type: 'DEBIT' | 'CREDIT';
+  transaction_ref: string | null;
+  description: string | null;
+  financial_year: string;
+}
+
+export interface CashExpenseCreate {
+  transaction_date: string;
+  expense_category_id?: number;
+  bank_account_id: number;
+  project_id?: number;
+  branch_id?: number;
+  amount: number;
+  transaction_type: 'DEBIT' | 'CREDIT';
+  transaction_ref?: string;
+  description?: string;
 }
 
 // Dashboard Types

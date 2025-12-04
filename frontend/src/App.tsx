@@ -31,6 +31,9 @@ import { Ledger } from './pages/ledger/Ledger';
 import { GSTReports } from './pages/reports/GSTReports';
 import { Reports } from './pages/reports/Reports';
 import { Settings } from './pages/settings/Settings';
+import { CashExpenses } from './pages/cash-expenses/CashExpenses';
+import { ExpenseCategories } from './pages/expense-categories/ExpenseCategories';
+import { Projects } from './pages/projects/Projects';
 
 function App() {
   return (
@@ -55,6 +58,9 @@ function App() {
               <Route path="invoices/:id/edit" element={<InvoiceForm />} />
               <Route path="invoices/:id" element={<InvoiceView />} />
               <Route path="payments" element={<Payments />} />
+              <Route path="cash-expenses" element={<CashExpenses />} />
+              <Route path="expense-categories" element={<ExpenseCategories />} />
+              <Route path="projects" element={<Projects />} />
               <Route path="ledger" element={<Ledger />} />
               <Route path="reports" element={<Reports />} />
               <Route path="reports/gst" element={<GSTReports />} />

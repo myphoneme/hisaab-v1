@@ -9,6 +9,9 @@ from app.schemas.purchase_order import (
 )
 from app.schemas.invoice import InvoiceCreate, InvoiceUpdate, InvoiceResponse, InvoiceItemCreate
 from app.schemas.payment import PaymentCreate, PaymentUpdate, PaymentResponse
+from app.schemas.expense_category import ExpenseCategoryCreate, ExpenseCategoryUpdate, ExpenseCategoryResponse
+from app.schemas.project import ProjectCreate, ProjectUpdate, ProjectResponse
+from app.schemas.cash_expense import CashExpenseCreate, CashExpenseUpdate, CashExpenseResponse
 from app.schemas.common import PaginatedResponse, Message
 
 __all__ = [
@@ -34,6 +37,15 @@ __all__ = [
     "PaymentCreate",
     "PaymentUpdate",
     "PaymentResponse",
+    "ExpenseCategoryCreate",
+    "ExpenseCategoryUpdate",
+    "ExpenseCategoryResponse",
+    "ProjectCreate",
+    "ProjectUpdate",
+    "ProjectResponse",
+    "CashExpenseCreate",
+    "CashExpenseUpdate",
+    "CashExpenseResponse",
     "PaginatedResponse",
     "Message",
 ]

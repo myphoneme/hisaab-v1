@@ -6,6 +6,7 @@ from app.models.purchase_order import PurchaseOrder
 from app.models.invoice import Invoice
 from app.models.payment import Payment
 from app.models.ledger import LedgerEntry
+from app.models.cash_expense import CashExpense
 
 
 def get_financial_year() -> str:
@@ -115,6 +116,28 @@ async def generate_voucher_number(db: AsyncSession, voucher_type: str = "JV") ->
                 )
             )
         ).where(LedgerEntry.voucher_number.like(f"{prefix}%"))
+    )
+    max_num = result.scalar() or 0
+
+    return f"{prefix}{str(max_num + 1).zfill(4)}"
+
+
+async def generate_expense_number(db: AsyncSession) -> str:
+    """Generate unique expense number for cash expenses."""
+    fy = get_financial_year()
+    prefix = f"EXP/{fy}/"
+    prefix_len = len(prefix)
+
+    # Get max sequence number by extracting numeric part
+    result = await db.execute(
+        select(
+            func.max(
+                cast(
+                    func.substr(CashExpense.expense_number, prefix_len + 1),
+                    Integer
+                )
+            )
+        ).where(CashExpense.expense_number.like(f"{prefix}%"))
     )
     max_num = result.scalar() or 0
 

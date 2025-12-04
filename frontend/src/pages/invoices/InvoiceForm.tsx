@@ -1,13 +1,16 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Plus, Trash2, Save, X } from 'lucide-react';
+import { Plus, Trash2, Save, X, Paperclip, Upload, Loader2 } from 'lucide-react';
+import { toast } from 'sonner';
 import { Card, CardContent, CardHeader } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
 import { BranchSelector } from '../../components/ui/BranchSelector';
-import { invoiceApi, clientApi, vendorApi } from '../../services/api';
-import type { Client, Vendor, Invoice } from '../../types';
+import { FileUpload } from '../../components/ui/FileUpload';
+import { AttachmentList } from '../../components/invoices/AttachmentList';
+import { invoiceApi, clientApi, vendorApi, invoiceAttachmentApi } from '../../services/api';
+import type { Client, Vendor, Invoice, InvoiceAttachment } from '../../types';
 
 interface InvoiceItem {
   serial_no: number;
@@ -48,6 +51,62 @@ export function InvoiceForm() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const isEdit = Boolean(id);
+
+  // Attachment states
+  const [filesToUpload, setFilesToUpload] = useState<File[]>([]);
+  const [isUploading, setIsUploading] = useState(false);
+  const [deletingAttachmentId, setDeletingAttachmentId] = useState<number | null>(null);
+
+  // Fetch attachments for edit mode
+  const { data: attachmentsData, refetch: refetchAttachments } = useQuery({
+    queryKey: ['invoice-attachments', id],
+    queryFn: async () => {
+      const response = await invoiceAttachmentApi.list(Number(id));
+      return response;
+    },
+    enabled: isEdit && !!id,
+  });
+
+  const attachments = (attachmentsData as { attachments: InvoiceAttachment[] })?.attachments || [];
+
+  const handleUploadFiles = async () => {
+    if (filesToUpload.length === 0 || !id) return;
+
+    setIsUploading(true);
+    try {
+      await invoiceAttachmentApi.upload(Number(id), filesToUpload);
+      toast.success(`${filesToUpload.length} file(s) uploaded successfully`);
+      setFilesToUpload([]);
+      refetchAttachments();
+    } catch (error: any) {
+      toast.error(error.message || 'Failed to upload files');
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
+  const handleDownloadAttachment = async (attachment: InvoiceAttachment) => {
+    try {
+      await invoiceAttachmentApi.download(Number(id), attachment.id, attachment.filename);
+    } catch {
+      toast.error('Failed to download file');
+    }
+  };
+
+  const handleDeleteAttachment = async (attachment: InvoiceAttachment) => {
+    if (!confirm(`Delete "${attachment.filename}"?`)) return;
+
+    setDeletingAttachmentId(attachment.id);
+    try {
+      await invoiceAttachmentApi.delete(Number(id), attachment.id);
+      toast.success('Attachment deleted');
+      refetchAttachments();
+    } catch {
+      toast.error('Failed to delete attachment');
+    } finally {
+      setDeletingAttachmentId(null);
+    }
+  };
 
   const [formData, setFormData] = useState<InvoiceFormData>({
     invoice_date: new Date().toISOString().split('T')[0],
@@ -756,6 +815,79 @@ export function InvoiceForm() {
             </div>
           </CardContent>
         </Card>
+
+        {/* Attachments - Only show in edit mode */}
+        {isEdit && (
+          <Card>
+            <CardHeader>
+              <h3 className="text-lg font-semibold flex items-center gap-2">
+                <Paperclip className="h-5 w-5" />
+                Attachments
+              </h3>
+            </CardHeader>
+            <CardContent className="p-6">
+              <div className="space-y-4">
+                {/* Existing attachments */}
+                {attachments.length > 0 && (
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Uploaded Files ({attachments.length})
+                    </label>
+                    <AttachmentList
+                      attachments={attachments}
+                      onDownload={handleDownloadAttachment}
+                      onDelete={handleDeleteAttachment}
+                      isDeleting={deletingAttachmentId}
+                      canDelete={true}
+                    />
+                  </div>
+                )}
+
+                {/* Upload new files */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Upload New Files
+                  </label>
+                  <FileUpload
+                    onFilesSelected={setFilesToUpload}
+                    maxSize={10}
+                    maxFiles={10 - attachments.length}
+                    disabled={attachments.length >= 10}
+                  />
+                </div>
+
+                {/* Upload button */}
+                {filesToUpload.length > 0 && (
+                  <div className="flex justify-end">
+                    <Button
+                      type="button"
+                      onClick={handleUploadFiles}
+                      disabled={isUploading}
+                    >
+                      {isUploading ? (
+                        <>
+                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                          Uploading...
+                        </>
+                      ) : (
+                        <>
+                          <Upload className="h-4 w-4 mr-2" />
+                          Upload {filesToUpload.length} File(s)
+                        </>
+                      )}
+                    </Button>
+                  </div>
+                )}
+
+                {attachments.length >= 10 && (
+                  <p className="text-sm text-amber-600">
+                    Maximum 10 files per invoice. Delete existing files to upload new ones.
+                  </p>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+        )}
 
         {/* Action Buttons */}
         <div className="flex justify-end gap-4">

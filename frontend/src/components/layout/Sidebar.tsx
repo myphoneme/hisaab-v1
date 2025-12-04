@@ -12,6 +12,9 @@ import {
   BookOpen,
   Landmark,
   MapPin,
+  Wallet,
+  Tag,
+  FolderKanban,
 } from 'lucide-react';
 import { cn } from '../../lib/utils';
 
@@ -24,6 +27,9 @@ const navigation = [
   { name: 'Purchase Orders', href: '/purchase-orders', icon: ShoppingCart },
   { name: 'Invoices', href: '/invoices', icon: FileText },
   { name: 'Payments', href: '/payments', icon: CreditCard },
+  { name: 'Cash Expenses', href: '/cash-expenses', icon: Wallet },
+  { name: 'Expense Categories', href: '/expense-categories', icon: Tag },
+  { name: 'Projects', href: '/projects', icon: FolderKanban },
   { name: 'Ledger', href: '/ledger', icon: BookOpen },
   { name: 'GST Reports', href: '/reports/gst', icon: Receipt },
   { name: 'Reports', href: '/reports', icon: BarChart3 },
