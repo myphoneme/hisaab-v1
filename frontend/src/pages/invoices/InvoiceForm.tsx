@@ -9,8 +9,8 @@ import { Input } from '../../components/ui/Input';
 import { BranchSelector } from '../../components/ui/BranchSelector';
 import { FileUpload } from '../../components/ui/FileUpload';
 import { AttachmentList } from '../../components/invoices/AttachmentList';
-import { invoiceApi, clientApi, vendorApi, invoiceAttachmentApi } from '../../services/api';
-import type { Client, Vendor, Invoice, InvoiceAttachment } from '../../types';
+import { invoiceApi, clientApi, vendorApi, invoiceAttachmentApi, stateApi, bankAccountApi } from '../../services/api';
+import type { Client, Vendor, Invoice, InvoiceAttachment, State, BankAccount } from '../../types';
 
 interface InvoiceItem {
   serial_no: number;
@@ -28,6 +28,7 @@ interface InvoiceFormData {
   invoice_date: string;
   invoice_type: 'SALES' | 'PURCHASE' | 'CREDIT_NOTE' | 'DEBIT_NOTE';
   branch_id?: number;
+  bank_account_id?: number;
   client_id?: number;
   vendor_id?: number;
   place_of_supply: string;
@@ -112,6 +113,7 @@ export function InvoiceForm() {
     invoice_date: new Date().toISOString().split('T')[0],
     invoice_type: 'SALES',
     branch_id: undefined,
+    bank_account_id: undefined,
     place_of_supply: '',
     place_of_supply_code: '',
     is_igst: false,
@@ -166,6 +168,7 @@ export function InvoiceForm() {
         invoice_date: existingInvoice.invoice_date.split('T')[0],
         invoice_type: existingInvoice.invoice_type,
         branch_id: existingInvoice.branch_id ?? undefined,
+        bank_account_id: existingInvoice.bank_account_id ?? undefined,
         client_id: existingInvoice.client_id ?? undefined,
         vendor_id: existingInvoice.vendor_id ?? undefined,
         place_of_supply: existingInvoice.place_of_supply || '',
@@ -199,6 +202,21 @@ export function InvoiceForm() {
     queryKey: ['vendors'],
     queryFn: async () => {
       const response = await vendorApi.getAll();
+      return response.items || [];
+    },
+  });
+
+  // Fetch states
+  const { data: states = [] } = useQuery<State[]>({
+    queryKey: ['states'],
+    queryFn: () => stateApi.getAll(),
+  });
+
+  // Fetch bank accounts
+  const { data: bankAccounts = [] } = useQuery<BankAccount[]>({
+    queryKey: ['bank-accounts'],
+    queryFn: async () => {
+      const response = await bankAccountApi.getAll({ is_active: true, page_size: 100 });
       return response.items || [];
     },
   });
@@ -447,27 +465,45 @@ export function InvoiceForm() {
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Place of Supply *
                 </label>
-                <Input
-                  value={formData.place_of_supply}
-                  onChange={(e) => handleChange('place_of_supply', e.target.value)}
-                  placeholder="e.g., Maharashtra"
+                <select
+                  className="w-full border border-gray-300 rounded-md px-3 py-2"
+                  value={formData.place_of_supply_code}
+                  onChange={(e) => {
+                    const selectedState = states.find(s => s.code === e.target.value);
+                    if (selectedState) {
+                      handleChange('place_of_supply_code', selectedState.code);
+                      handleChange('place_of_supply', selectedState.name);
+                    }
+                  }}
                   required
-                />
+                >
+                  <option value="">Select State</option>
+                  {states.map((state) => (
+                    <option key={state.id} value={state.code}>
+                      {state.code} - {state.name}
+                    </option>
+                  ))}
+                </select>
               </div>
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                  State Code *
+                  Bank Account
                 </label>
-                <Input
-                  value={formData.place_of_supply_code}
+                <select
+                  className="w-full border border-gray-300 rounded-md px-3 py-2"
+                  value={formData.bank_account_id || ''}
                   onChange={(e) =>
-                    handleChange('place_of_supply_code', e.target.value)
+                    handleChange('bank_account_id', e.target.value ? Number(e.target.value) : undefined)
                   }
-                  placeholder="e.g., 27"
-                  maxLength={2}
-                  required
-                />
+                >
+                  <option value="">Select Bank Account</option>
+                  {bankAccounts.map((account) => (
+                    <option key={account.id} value={account.id}>
+                      {account.account_name} - {account.bank_name} ({account.account_number.slice(-4)})
+                    </option>
+                  ))}
+                </select>
               </div>
 
               <div className="flex items-center pt-6">

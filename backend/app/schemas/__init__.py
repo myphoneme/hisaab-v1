@@ -12,6 +12,24 @@ from app.schemas.payment import PaymentCreate, PaymentUpdate, PaymentResponse
 from app.schemas.expense_category import ExpenseCategoryCreate, ExpenseCategoryUpdate, ExpenseCategoryResponse
 from app.schemas.project import ProjectCreate, ProjectUpdate, ProjectResponse
 from app.schemas.cash_expense import CashExpenseCreate, CashExpenseUpdate, CashExpenseResponse
+from app.schemas.item import ItemCreate, ItemUpdate, ItemResponse
+from app.schemas.client_po import (
+    ClientPOCreate,
+    ClientPOUpdate,
+    ClientPOResponse,
+    ClientPOWithItemsResponse,
+    ClientPOListResponse,
+    ClientPOItemCreate,
+    ClientPOStatusUpdate,
+)
+from app.schemas.billing_schedule import (
+    BillingScheduleCreate,
+    BillingScheduleUpdate,
+    BillingScheduleResponse,
+    BillingScheduleWithPOResponse,
+    BillingScheduleStatusUpdate,
+    GenerateSchedulesRequest,
+)
 from app.schemas.common import PaginatedResponse, Message
 
 __all__ = [
@@ -46,6 +64,22 @@ __all__ = [
     "CashExpenseCreate",
     "CashExpenseUpdate",
     "CashExpenseResponse",
+    "ItemCreate",
+    "ItemUpdate",
+    "ItemResponse",
+    "ClientPOCreate",
+    "ClientPOUpdate",
+    "ClientPOResponse",
+    "ClientPOWithItemsResponse",
+    "ClientPOListResponse",
+    "ClientPOItemCreate",
+    "ClientPOStatusUpdate",
+    "BillingScheduleCreate",
+    "BillingScheduleUpdate",
+    "BillingScheduleResponse",
+    "BillingScheduleWithPOResponse",
+    "BillingScheduleStatusUpdate",
+    "GenerateSchedulesRequest",
     "PaginatedResponse",
     "Message",
 ]

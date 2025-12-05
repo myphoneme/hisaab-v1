@@ -35,3 +35,4 @@ class Branch(BaseModel):
     payments = relationship("Payment", back_populates="branch")
     purchase_orders = relationship("PurchaseOrder", back_populates="branch")
     ledger_entries = relationship("LedgerEntry", back_populates="branch")
+    client_pos = relationship("ClientPO", back_populates="branch")

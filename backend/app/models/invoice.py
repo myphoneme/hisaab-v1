@@ -36,8 +36,15 @@ class Invoice(BaseModel):
     # Branch
     branch_id = Column(Integer, ForeignKey("branches.id"), nullable=True, index=True)
 
-    # Reference to PO
+    # Bank Account (for printing on invoice)
+    bank_account_id = Column(Integer, ForeignKey("bank_accounts.id"), nullable=True, index=True)
+
+    # Reference to PO (Purchase Order)
     po_id = Column(Integer, ForeignKey("purchase_orders.id"), nullable=True)
+
+    # Reference to Client PO (Sales Order) and Billing Schedule
+    client_po_id = Column(Integer, ForeignKey("client_pos.id"), nullable=True)
+    billing_schedule_id = Column(Integer, ForeignKey("billing_schedules.id"), nullable=True)
 
     # GST Details
     place_of_supply = Column(String(100), nullable=False)
@@ -96,7 +103,10 @@ class Invoice(BaseModel):
     client = relationship("Client", back_populates="invoices")
     vendor = relationship("Vendor", back_populates="invoices")
     branch = relationship("Branch", back_populates="invoices")
+    bank_account = relationship("BankAccount")
     purchase_order = relationship("PurchaseOrder", back_populates="invoices")
+    client_po = relationship("ClientPO", back_populates="invoices")
+    billing_schedule = relationship("BillingSchedule", foreign_keys=[billing_schedule_id])
     items = relationship("InvoiceItem", back_populates="invoice", cascade="all, delete-orphan")
     payments = relationship("Payment", back_populates="invoice")
     attachments = relationship("InvoiceAttachment", back_populates="invoice", cascade="all, delete-orphan")

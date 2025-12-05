@@ -30,10 +30,15 @@ import { PurchaseOrders } from './pages/purchase-orders/PurchaseOrders';
 import { Ledger } from './pages/ledger/Ledger';
 import { GSTReports } from './pages/reports/GSTReports';
 import { Reports } from './pages/reports/Reports';
+import { ExpectedIncome } from './pages/reports/ExpectedIncome';
 import { Settings } from './pages/settings/Settings';
 import { CashExpenses } from './pages/cash-expenses/CashExpenses';
 import { ExpenseCategories } from './pages/expense-categories/ExpenseCategories';
 import { Projects } from './pages/projects/Projects';
+import { Items } from './pages/items/Items';
+import { ClientPOs } from './pages/client-pos/ClientPOs';
+import { ClientPOForm } from './pages/client-pos/ClientPOForm';
+import { ClientPOView } from './pages/client-pos/ClientPOView';
 
 function App() {
   return (
@@ -52,6 +57,11 @@ function App() {
               <Route path="vendors" element={<Vendors />} />
               <Route path="branches" element={<Branches />} />
               <Route path="bank-accounts" element={<BankAccounts />} />
+              <Route path="items" element={<Items />} />
+              <Route path="client-pos" element={<ClientPOs />} />
+              <Route path="client-pos/new" element={<ClientPOForm />} />
+              <Route path="client-pos/:id" element={<ClientPOView />} />
+              <Route path="client-pos/:id/edit" element={<ClientPOForm />} />
               <Route path="purchase-orders" element={<PurchaseOrders />} />
               <Route path="invoices" element={<Invoices />} />
               <Route path="invoices/new" element={<InvoiceForm />} />
@@ -64,6 +74,7 @@ function App() {
               <Route path="ledger" element={<Ledger />} />
               <Route path="reports" element={<Reports />} />
               <Route path="reports/gst" element={<GSTReports />} />
+              <Route path="reports/expected-income" element={<ExpectedIncome />} />
               <Route path="settings" element={<Settings />} />
             </Route>
           </Route>

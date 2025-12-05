@@ -16,6 +16,9 @@ from app.api.v1.endpoints import (
     expense_categories,
     projects,
     cash_expenses,
+    states,
+    items,
+    client_pos,
 )
 
 api_router = APIRouter()
@@ -35,3 +38,6 @@ api_router.include_router(settings.router, prefix="/settings", tags=["Settings"]
 api_router.include_router(expense_categories.router, prefix="/expense-categories", tags=["Expense Categories"])
 api_router.include_router(projects.router, prefix="/projects", tags=["Projects"])
 api_router.include_router(cash_expenses.router, prefix="/cash-expenses", tags=["Cash Expenses"])
+api_router.include_router(states.router, prefix="/states", tags=["States"])
+api_router.include_router(items.router, prefix="/items", tags=["Items"])
+api_router.include_router(client_pos.router, prefix="/client-pos", tags=["Client POs"])

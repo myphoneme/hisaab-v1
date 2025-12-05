@@ -51,3 +51,4 @@ class Client(BaseModel):
     purchase_orders = relationship("PurchaseOrder", back_populates="client")
     invoices = relationship("Invoice", back_populates="client")
     payments = relationship("Payment", back_populates="client")
+    client_pos = relationship("ClientPO", back_populates="client")

@@ -259,6 +259,8 @@ export interface Invoice extends BaseEntity {
   vendor?: Vendor;
   branch_id: number | null;
   branch?: Branch;
+  bank_account_id: number | null;
+  bank_account?: BankAccount;
   po_id: number | null;
   po?: PurchaseOrder;
   place_of_supply: string;
@@ -422,6 +424,196 @@ export interface TrialBalance {
   accounts: TrialBalanceItem[];
   total_debit: number;
   total_credit: number;
+}
+
+// State Types
+export interface State extends BaseEntity {
+  code: string;
+  name: string;
+  is_active: boolean;
+}
+
+// Item Types
+export interface Item extends BaseEntity {
+  code: string;
+  name: string;
+  description: string | null;
+  item_type: 'GOODS' | 'SERVICES';
+  hsn_sac: string | null;
+  default_gst_rate: number;
+  default_unit: string;
+  default_rate: number | null;
+  is_active: boolean;
+}
+
+export interface ItemCreate {
+  code: string;
+  name: string;
+  description?: string;
+  item_type?: 'GOODS' | 'SERVICES';
+  hsn_sac?: string;
+  default_gst_rate?: number;
+  default_unit?: string;
+  default_rate?: number;
+}
+
+export interface ItemUpdate {
+  code?: string;
+  name?: string;
+  description?: string;
+  item_type?: 'GOODS' | 'SERVICES';
+  hsn_sac?: string;
+  default_gst_rate?: number;
+  default_unit?: string;
+  default_rate?: number;
+  is_active?: boolean;
+}
+
+// Client PO Types
+export type ClientPOStatus = 'DRAFT' | 'ACTIVE' | 'PARTIAL' | 'COMPLETED' | 'CANCELLED' | 'EXPIRED';
+export type BillingFrequency = 'ONE_TIME' | 'MONTHLY' | 'QUARTERLY' | 'HALF_YEARLY' | 'YEARLY' | 'MILESTONE';
+export type ScheduleStatus = 'PENDING' | 'PI_RAISED' | 'INVOICED' | 'CANCELLED';
+
+export interface ClientPOItem {
+  id: number;
+  client_po_id: number;
+  item_id: number | null;
+  serial_no: number;
+  description: string;
+  hsn_sac: string | null;
+  quantity: number;
+  unit: string;
+  rate: number;
+  amount: number;
+  gst_rate: number;
+  cgst_amount: number;
+  sgst_amount: number;
+  igst_amount: number;
+  total_amount: number;
+  invoiced_quantity: number;
+  remaining_quantity: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ClientPOItemCreate {
+  item_id?: number;
+  serial_no: number;
+  description: string;
+  hsn_sac?: string;
+  quantity: number;
+  unit?: string;
+  rate: number;
+  amount: number;
+  gst_rate?: number;
+}
+
+export interface ClientPO extends BaseEntity {
+  internal_number: string;
+  client_po_number: string | null;
+  client_po_date: string | null;
+  received_date: string;
+  client_id: number;
+  branch_id: number | null;
+  subject: string | null;
+  notes: string | null;
+  valid_from: string;
+  valid_until: string | null;
+  billing_frequency: BillingFrequency;
+  place_of_supply: string | null;
+  place_of_supply_code: string | null;
+  is_igst: boolean;
+  subtotal: number;
+  discount_percent: number;
+  discount_amount: number;
+  taxable_amount: number;
+  cgst_amount: number;
+  sgst_amount: number;
+  igst_amount: number;
+  total_amount: number;
+  invoiced_amount: number;
+  remaining_amount: number;
+  status: ClientPOStatus;
+  items?: ClientPOItem[];
+  client_name?: string;
+  branch_name?: string | null;
+}
+
+export interface ClientPOCreate {
+  client_po_number?: string;
+  client_po_date?: string;
+  received_date: string;
+  client_id: number;
+  branch_id?: number;
+  subject?: string;
+  notes?: string;
+  valid_from: string;
+  valid_until?: string;
+  billing_frequency?: BillingFrequency;
+  place_of_supply?: string;
+  place_of_supply_code?: string;
+  is_igst?: boolean;
+  discount_percent?: number;
+  discount_amount?: number;
+  items: ClientPOItemCreate[];
+}
+
+export interface ClientPOUpdate {
+  client_po_number?: string;
+  client_po_date?: string;
+  received_date?: string;
+  client_id?: number;
+  branch_id?: number;
+  subject?: string;
+  notes?: string;
+  valid_from?: string;
+  valid_until?: string;
+  billing_frequency?: BillingFrequency;
+  place_of_supply?: string;
+  place_of_supply_code?: string;
+  is_igst?: boolean;
+  discount_percent?: number;
+  discount_amount?: number;
+  items?: ClientPOItemCreate[];
+}
+
+export interface BillingSchedule extends BaseEntity {
+  client_po_id: number;
+  installment_number: number;
+  description: string | null;
+  due_date: string;
+  amount: number;
+  gst_amount: number;
+  total_amount: number;
+  status: ScheduleStatus;
+  proforma_invoice_id: number | null;
+  invoice_id: number | null;
+  notes: string | null;
+  client_po_internal_number?: string;
+  client_name?: string;
+}
+
+export interface BillingScheduleCreate {
+  client_po_id: number;
+  installment_number: number;
+  description?: string;
+  due_date: string;
+  amount: number;
+  gst_amount: number;
+  total_amount: number;
+  notes?: string;
+}
+
+export interface GenerateSchedulesRequest {
+  start_date: string;
+  end_date?: string;
+}
+
+export interface CreateInvoiceFromScheduleRequest {
+  invoice_date?: string;
+  due_date?: string;
+  bank_account_id?: number;
+  notes?: string;
 }
 
 // Expense Category Types

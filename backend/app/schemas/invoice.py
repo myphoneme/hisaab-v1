@@ -7,6 +7,7 @@ from app.models.invoice import InvoiceType, InvoiceStatus
 from app.schemas.client import ClientResponse
 from app.schemas.vendor import VendorResponse
 from app.schemas.branch import BranchResponse
+from app.schemas.bank_account import BankAccountResponse
 
 
 class InvoiceItemBase(BaseModel):
@@ -52,7 +53,10 @@ class InvoiceBase(BaseModel):
     client_id: Optional[int] = None
     vendor_id: Optional[int] = None
     branch_id: Optional[int] = None
+    bank_account_id: Optional[int] = None
     po_id: Optional[int] = None
+    client_po_id: Optional[int] = None
+    billing_schedule_id: Optional[int] = None
     place_of_supply: str
     place_of_supply_code: str
     is_igst: bool = False
@@ -77,7 +81,10 @@ class InvoiceUpdate(BaseModel):
     client_id: Optional[int] = None
     vendor_id: Optional[int] = None
     branch_id: Optional[int] = None
+    bank_account_id: Optional[int] = None
     po_id: Optional[int] = None
+    client_po_id: Optional[int] = None
+    billing_schedule_id: Optional[int] = None
     place_of_supply: Optional[str] = None
     place_of_supply_code: Optional[str] = None
     is_igst: Optional[bool] = None
@@ -121,6 +128,7 @@ class InvoiceResponse(InvoiceBase):
     client: Optional[ClientResponse] = None
     vendor: Optional[VendorResponse] = None
     branch: Optional[BranchResponse] = None
+    bank_account: Optional[BankAccountResponse] = None
     created_at: datetime
     updated_at: datetime
 

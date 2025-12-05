@@ -13,6 +13,7 @@ from app.db.session import get_db
 from app.models.invoice import Invoice, InvoiceItem, InvoiceType, InvoiceStatus
 from app.models.client import Client
 from app.models.vendor import Vendor
+from app.models.bank_account import BankAccount
 from app.models.user import User
 from app.schemas.invoice import InvoiceCreate, InvoiceUpdate, InvoiceResponse, InvoiceItemCreate
 from app.schemas.common import PaginatedResponse, Message
@@ -92,7 +93,8 @@ async def get_invoices(
         selectinload(Invoice.items),
         selectinload(Invoice.client),
         selectinload(Invoice.vendor),
-        selectinload(Invoice.branch)
+        selectinload(Invoice.branch),
+        selectinload(Invoice.bank_account).selectinload(BankAccount.branch)
     )
 
     if branch_id:
@@ -142,7 +144,8 @@ async def get_invoice(
             selectinload(Invoice.items),
             selectinload(Invoice.client),
             selectinload(Invoice.vendor),
-            selectinload(Invoice.branch)
+            selectinload(Invoice.branch),
+            selectinload(Invoice.bank_account).selectinload(BankAccount.branch)
         )
         .where(Invoice.id == invoice_id)
     )
@@ -276,7 +279,8 @@ async def create_invoice(
             selectinload(Invoice.items),
             selectinload(Invoice.client),
             selectinload(Invoice.vendor),
-            selectinload(Invoice.branch)
+            selectinload(Invoice.branch),
+            selectinload(Invoice.bank_account).selectinload(BankAccount.branch)
         )
         .where(Invoice.id == invoice.id)
     )
@@ -377,7 +381,8 @@ async def update_invoice(
             selectinload(Invoice.items),
             selectinload(Invoice.client),
             selectinload(Invoice.vendor),
-            selectinload(Invoice.branch)
+            selectinload(Invoice.branch),
+            selectinload(Invoice.bank_account).selectinload(BankAccount.branch)
         )
         .where(Invoice.id == invoice.id)
     )
@@ -398,7 +403,8 @@ async def update_invoice_status(
             selectinload(Invoice.items),
             selectinload(Invoice.client),
             selectinload(Invoice.vendor),
-            selectinload(Invoice.branch)
+            selectinload(Invoice.branch),
+            selectinload(Invoice.bank_account).selectinload(BankAccount.branch)
         )
         .where(Invoice.id == invoice_id)
     )
@@ -441,7 +447,8 @@ async def update_invoice_status(
             selectinload(Invoice.items),
             selectinload(Invoice.client),
             selectinload(Invoice.vendor),
-            selectinload(Invoice.branch)
+            selectinload(Invoice.branch),
+            selectinload(Invoice.bank_account).selectinload(BankAccount.branch)
         )
         .where(Invoice.id == invoice.id)
     )

@@ -18,6 +18,10 @@ import type {
   ExpenseCategory,
   Project,
   CashExpense,
+  State,
+  Item,
+  ClientPO,
+  BillingSchedule,
 } from '../types';
 
 const API_BASE_URL = '/api/v1';
@@ -249,7 +253,45 @@ export const reportsApi = {
     if (!response.ok) throw new Error('Failed to download PDF');
     return response.blob();
   },
+  getExpectedIncome: (params?: Record<string, unknown>) => api.get<ExpectedIncomeResponse>('/reports/expected-income', params),
 };
+
+// Expected Income Response type
+export interface ExpectedIncomeResponse {
+  period: { from: string; to: string };
+  summary: {
+    total_schedules: number;
+    total_amount: number;
+    total_gst: number;
+    total_expected: number;
+  };
+  monthly_forecast: Array<{
+    month: string;
+    month_name: string;
+    schedule_count: number;
+    amount: number;
+    gst_amount: number;
+    total_amount: number;
+  }>;
+  client_summary: Array<{
+    client_id: number;
+    client_name: string;
+    schedule_count: number;
+    total_expected: number;
+  }>;
+  details: Array<{
+    id: number;
+    client_po_id: number;
+    client_po_number: string | null;
+    client_name: string | null;
+    installment_number: number;
+    description: string | null;
+    due_date: string;
+    amount: number;
+    gst_amount: number;
+    total_amount: number;
+  }>;
+}
 
 // Settings API
 export const settingsApi = {
@@ -379,4 +421,43 @@ export const cashExpenseApi = {
   create: (data: unknown) => api.post<CashExpense>('/cash-expenses', data),
   update: (id: number, data: unknown) => api.patch<CashExpense>(`/cash-expenses/${id}`, data),
   delete: (id: number) => api.delete<{ message: string }>(`/cash-expenses/${id}`),
+};
+
+// State API
+export const stateApi = {
+  getAll: () => api.get<State[]>('/states'),
+  getByCode: (code: string) => api.get<State>(`/states/${code}`),
+};
+
+// Item API
+export const itemApi = {
+  getAll: (params?: Record<string, unknown>) => api.get<PaginatedResponse<Item>>('/items', params),
+  getActive: (item_type?: 'GOODS' | 'SERVICES') => api.get<Item[]>('/items/active', item_type ? { item_type } : undefined),
+  getById: (id: number) => api.get<Item>(`/items/${id}`),
+  create: (data: unknown) => api.post<Item>('/items', data),
+  update: (id: number, data: unknown) => api.patch<Item>(`/items/${id}`, data),
+  delete: (id: number) => api.delete<{ message: string }>(`/items/${id}`),
+};
+
+// Client PO API (Sales Orders received from clients)
+export const clientPOApi = {
+  getAll: (params?: Record<string, unknown>) => api.get<PaginatedResponse<ClientPO>>('/client-pos', params),
+  getById: (id: number) => api.get<ClientPO>(`/client-pos/${id}`),
+  create: (data: unknown) => api.post<ClientPO>('/client-pos', data),
+  update: (id: number, data: unknown) => api.patch<ClientPO>(`/client-pos/${id}`, data),
+  updateStatus: (id: number, status: string) => api.patch<ClientPO>(`/client-pos/${id}/status`, { status }),
+  delete: (id: number) => api.delete<{ message: string }>(`/client-pos/${id}`),
+  // Billing Schedules
+  getSchedules: (poId: number) => api.get<BillingSchedule[]>(`/client-pos/${poId}/schedules`),
+  generateSchedules: (poId: number, data: { start_date: string; end_date?: string }) =>
+    api.post<BillingSchedule[]>(`/client-pos/${poId}/schedules/generate`, data),
+  createSchedule: (poId: number, data: unknown) =>
+    api.post<BillingSchedule>(`/client-pos/${poId}/schedules`, data),
+  updateSchedule: (poId: number, scheduleId: number, data: unknown) =>
+    api.patch<BillingSchedule>(`/client-pos/${poId}/schedules/${scheduleId}`, data),
+  deleteSchedule: (poId: number, scheduleId: number) =>
+    api.delete<{ message: string }>(`/client-pos/${poId}/schedules/${scheduleId}`),
+  // Create invoice from schedule
+  createInvoiceFromSchedule: (poId: number, scheduleId: number, data?: { invoice_date?: string; due_date?: string; bank_account_id?: number; notes?: string }) =>
+    api.post<Invoice>(`/client-pos/${poId}/schedules/${scheduleId}/create-invoice`, data || {}),
 };

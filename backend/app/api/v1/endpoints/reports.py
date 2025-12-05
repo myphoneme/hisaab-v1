@@ -15,7 +15,10 @@ from app.models.client import Client
 from app.models.vendor import Vendor
 from app.models.user import User
 from app.models.settings import CompanySettings
+from app.models.billing_schedule import BillingSchedule, ScheduleStatus
+from app.models.client_po import ClientPO
 from app.core.security import get_current_user
+import calendar
 
 router = APIRouter()
 
@@ -1446,3 +1449,156 @@ async def get_party_ledger_pdf(
         media_type="application/pdf",
         headers={"Content-Disposition": f'attachment; filename="{filename}"'}
     )
+
+
+@router.get("/expected-income")
+async def get_expected_income(
+    from_month: Optional[str] = Query(None, description="Start month in YYYY-MM format"),
+    to_month: Optional[str] = Query(None, description="End month in YYYY-MM format"),
+    client_id: Optional[int] = None,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """
+    Get expected income report based on pending billing schedules.
+
+    Returns:
+        - Total expected income
+        - Monthly forecast with schedule counts
+        - Client-wise summary
+        - Detailed pending schedules
+    """
+    # Default to next 12 months if not specified
+    today = datetime.now().date()
+    if not from_month:
+        from_date = today.replace(day=1)
+    else:
+        try:
+            from_date = datetime.strptime(from_month + "-01", "%Y-%m-%d").date()
+        except ValueError:
+            raise HTTPException(status_code=400, detail="Invalid from_month format. Use YYYY-MM")
+
+    if not to_month:
+        # Default to 12 months from now
+        to_date = (today + timedelta(days=365)).replace(day=28)
+    else:
+        try:
+            to_date_temp = datetime.strptime(to_month + "-01", "%Y-%m-%d").date()
+            # Set to last day of the month
+            last_day = calendar.monthrange(to_date_temp.year, to_date_temp.month)[1]
+            to_date = to_date_temp.replace(day=last_day)
+        except ValueError:
+            raise HTTPException(status_code=400, detail="Invalid to_month format. Use YYYY-MM")
+
+    # Build query for pending schedules
+    query = (
+        select(BillingSchedule)
+        .options(
+            selectinload(BillingSchedule.client_po).selectinload(ClientPO.client)
+        )
+        .where(BillingSchedule.status == ScheduleStatus.PENDING)
+        .where(BillingSchedule.due_date >= from_date)
+        .where(BillingSchedule.due_date <= to_date)
+    )
+
+    if client_id:
+        query = query.join(ClientPO).where(ClientPO.client_id == client_id)
+
+    query = query.order_by(BillingSchedule.due_date)
+
+    result = await db.execute(query)
+    schedules = result.scalars().all()
+
+    # Aggregate by month
+    monthly_data = {}
+    client_data = {}
+    details = []
+
+    total_amount = Decimal('0')
+    total_gst = Decimal('0')
+    total_total = Decimal('0')
+
+    for schedule in schedules:
+        # Monthly aggregation
+        month_key = schedule.due_date.strftime("%Y-%m")
+        month_name = schedule.due_date.strftime("%B %Y")
+
+        if month_key not in monthly_data:
+            monthly_data[month_key] = {
+                "month": month_key,
+                "month_name": month_name,
+                "schedule_count": 0,
+                "amount": Decimal('0'),
+                "gst_amount": Decimal('0'),
+                "total_amount": Decimal('0'),
+            }
+
+        monthly_data[month_key]["schedule_count"] += 1
+        monthly_data[month_key]["amount"] += schedule.amount
+        monthly_data[month_key]["gst_amount"] += schedule.gst_amount
+        monthly_data[month_key]["total_amount"] += schedule.total_amount
+
+        # Client aggregation
+        client_po = schedule.client_po
+        if client_po and client_po.client:
+            client = client_po.client
+            if client.id not in client_data:
+                client_data[client.id] = {
+                    "client_id": client.id,
+                    "client_name": client.name,
+                    "schedule_count": 0,
+                    "total_expected": Decimal('0'),
+                }
+            client_data[client.id]["schedule_count"] += 1
+            client_data[client.id]["total_expected"] += schedule.total_amount
+
+        # Totals
+        total_amount += schedule.amount
+        total_gst += schedule.gst_amount
+        total_total += schedule.total_amount
+
+        # Detail record
+        details.append({
+            "id": schedule.id,
+            "client_po_id": schedule.client_po_id,
+            "client_po_number": client_po.internal_number if client_po else None,
+            "client_name": client_po.client.name if client_po and client_po.client else None,
+            "installment_number": schedule.installment_number,
+            "description": schedule.description,
+            "due_date": str(schedule.due_date),
+            "amount": float(schedule.amount),
+            "gst_amount": float(schedule.gst_amount),
+            "total_amount": float(schedule.total_amount),
+        })
+
+    # Convert aggregated data to lists
+    monthly_forecast = [
+        {
+            **data,
+            "amount": float(data["amount"]),
+            "gst_amount": float(data["gst_amount"]),
+            "total_amount": float(data["total_amount"]),
+        }
+        for data in sorted(monthly_data.values(), key=lambda x: x["month"])
+    ]
+
+    client_summary = [
+        {
+            **data,
+            "total_expected": float(data["total_expected"]),
+        }
+        for data in sorted(client_data.values(), key=lambda x: x["total_expected"], reverse=True)
+    ]
+
+    return {
+        "period": {"from": str(from_date), "to": str(to_date)},
+        "summary": {
+            "total_schedules": len(schedules),
+            "total_amount": float(total_amount),
+            "total_gst": float(total_gst),
+            "total_expected": float(total_total),
+        },
+        "monthly_forecast": monthly_forecast,
+        "client_summary": client_summary,
+        "details": details,
+    }

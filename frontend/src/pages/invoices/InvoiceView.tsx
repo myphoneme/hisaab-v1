@@ -332,10 +332,8 @@ export function InvoiceView() {
                 </thead>
                 <tbody>
                   {invoice.items?.map((item, index) => {
-                    const itemAmount = item.quantity * item.rate;
-                    const gstAmount = itemAmount * (item.gst_rate / 100);
-                    const cessAmount = item.cess_amount || 0;
-                    const totalAmount = itemAmount + gstAmount + cessAmount;
+                    const itemAmount = Number(item.quantity) * Number(item.rate);
+                    const gstAmount = Number(item.cgst_amount || 0) + Number(item.sgst_amount || 0) + Number(item.igst_amount || 0);
 
                     return (
                       <tr key={item.id} className="border-b">
@@ -349,9 +347,9 @@ export function InvoiceView() {
                         </td>
                         <td className="px-3 py-2 text-right">{formatCurrency(item.rate)}</td>
                         <td className="px-3 py-2 text-right">{formatCurrency(itemAmount)}</td>
-                        <td className="px-3 py-2 text-right">{item.gst_rate}%</td>
+                        <td className="px-3 py-2 text-right">{Number(item.gst_rate)}%</td>
                         <td className="px-3 py-2 text-right">{formatCurrency(gstAmount)}</td>
-                        <td className="px-3 py-2 text-right font-medium">{formatCurrency(totalAmount)}</td>
+                        <td className="px-3 py-2 text-right font-medium">{formatCurrency(item.total_amount)}</td>
                       </tr>
                     );
                   })}
@@ -480,6 +478,45 @@ export function InvoiceView() {
                     <p className="text-gray-600 whitespace-pre-line">{settings.invoice_terms}</p>
                   </div>
                 )}
+              </div>
+            </div>
+          )}
+
+          {/* Bank Account Details */}
+          {invoice.bank_account && (
+            <div className="mt-8 pt-6 border-t">
+              <h3 className="text-lg font-semibold mb-3">Bank Details for Payment</h3>
+              <div className="bg-gray-50 p-4 rounded-lg text-sm">
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <p className="text-gray-600">Account Name</p>
+                    <p className="font-medium">{invoice.bank_account.account_name}</p>
+                  </div>
+                  <div>
+                    <p className="text-gray-600">Bank Name</p>
+                    <p className="font-medium">{invoice.bank_account.bank_name}</p>
+                  </div>
+                  <div>
+                    <p className="text-gray-600">Account Number</p>
+                    <p className="font-medium">{invoice.bank_account.account_number}</p>
+                  </div>
+                  <div>
+                    <p className="text-gray-600">IFSC Code</p>
+                    <p className="font-medium">{invoice.bank_account.ifsc_code}</p>
+                  </div>
+                  {invoice.bank_account.branch_name && (
+                    <div>
+                      <p className="text-gray-600">Branch</p>
+                      <p className="font-medium">{invoice.bank_account.branch_name}</p>
+                    </div>
+                  )}
+                  {invoice.bank_account.upi_id && (
+                    <div>
+                      <p className="text-gray-600">UPI ID</p>
+                      <p className="font-medium">{invoice.bank_account.upi_id}</p>
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
           )}

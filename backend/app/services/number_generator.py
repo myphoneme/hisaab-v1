@@ -7,6 +7,7 @@ from app.models.invoice import Invoice
 from app.models.payment import Payment
 from app.models.ledger import LedgerEntry
 from app.models.cash_expense import CashExpense
+from app.models.client_po import ClientPO
 
 
 def get_financial_year() -> str:
@@ -138,6 +139,28 @@ async def generate_expense_number(db: AsyncSession) -> str:
                 )
             )
         ).where(CashExpense.expense_number.like(f"{prefix}%"))
+    )
+    max_num = result.scalar() or 0
+
+    return f"{prefix}{str(max_num + 1).zfill(4)}"
+
+
+async def generate_client_po_number(db: AsyncSession) -> str:
+    """Generate unique Client PO internal number (CPO/2024-25/0001)."""
+    fy = get_financial_year()
+    prefix = f"CPO/{fy}/"
+    prefix_len = len(prefix)
+
+    # Get max sequence number by extracting numeric part
+    result = await db.execute(
+        select(
+            func.max(
+                cast(
+                    func.substr(ClientPO.internal_number, prefix_len + 1),
+                    Integer
+                )
+            )
+        ).where(ClientPO.internal_number.like(f"{prefix}%"))
     )
     max_num = result.scalar() or 0
 

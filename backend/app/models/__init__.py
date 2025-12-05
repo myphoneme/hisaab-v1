@@ -12,6 +12,10 @@ from app.models.settings import CompanySettings
 from app.models.expense_category import ExpenseCategory
 from app.models.project import Project
 from app.models.cash_expense import CashExpense
+from app.models.state import State
+from app.models.item import Item
+from app.models.client_po import ClientPO, ClientPOItem, ClientPOStatus, BillingFrequency
+from app.models.billing_schedule import BillingSchedule, ScheduleStatus
 
 __all__ = [
     "User",
@@ -31,4 +35,12 @@ __all__ = [
     "ExpenseCategory",
     "Project",
     "CashExpense",
+    "State",
+    "Item",
+    "ClientPO",
+    "ClientPOItem",
+    "ClientPOStatus",
+    "BillingFrequency",
+    "BillingSchedule",
+    "ScheduleStatus",
 ]

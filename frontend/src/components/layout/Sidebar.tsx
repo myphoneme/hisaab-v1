@@ -15,6 +15,9 @@ import {
   Wallet,
   Tag,
   FolderKanban,
+  Package,
+  ClipboardList,
+  TrendingUp,
 } from 'lucide-react';
 import { cn } from '../../lib/utils';
 
@@ -24,6 +27,8 @@ const navigation = [
   { name: 'Vendors', href: '/vendors', icon: Building2 },
   { name: 'Branches', href: '/branches', icon: MapPin },
   { name: 'Bank Accounts', href: '/bank-accounts', icon: Landmark },
+  { name: 'Items', href: '/items', icon: Package },
+  { name: 'Client POs', href: '/client-pos', icon: ClipboardList },
   { name: 'Purchase Orders', href: '/purchase-orders', icon: ShoppingCart },
   { name: 'Invoices', href: '/invoices', icon: FileText },
   { name: 'Payments', href: '/payments', icon: CreditCard },
@@ -32,6 +37,7 @@ const navigation = [
   { name: 'Projects', href: '/projects', icon: FolderKanban },
   { name: 'Ledger', href: '/ledger', icon: BookOpen },
   { name: 'GST Reports', href: '/reports/gst', icon: Receipt },
+  { name: 'Expected Income', href: '/reports/expected-income', icon: TrendingUp },
   { name: 'Reports', href: '/reports', icon: BarChart3 },
   { name: 'Settings', href: '/settings', icon: Settings },
 ];
