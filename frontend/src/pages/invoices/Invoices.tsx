@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Plus, Eye, Trash2, Search, FileText, Edit, Send, Download } from 'lucide-react';
+import { Plus, Eye, Trash2, Search, FileText, Edit, Send, Download, ChevronLeft, ChevronRight } from 'lucide-react';
 import { toast } from 'sonner';
 import { invoiceApi } from '../../services/api';
 import type { Invoice } from '../../types';
@@ -10,27 +10,58 @@ import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
 import { Badge } from '../../components/ui/Badge';
 import { BranchSelector } from '../../components/ui/BranchSelector';
+import { FinancialYearSelector } from '../../components/ui/FinancialYearSelector';
 import { formatCurrency } from '../../lib/utils';
 import { exportToCSV, invoiceExportColumns } from '../../lib/export';
+
+interface PaginatedInvoiceResponse {
+  items: Invoice[];
+  total: number;
+  page: number;
+  page_size: number;
+  pages: number;
+}
 
 export function Invoices() {
   const navigate = useNavigate();
   const [searchTerm, setSearchTerm] = useState('');
   const [branchId, setBranchId] = useState<number | string>('');
   const [statusFilter, setStatusFilter] = useState<string>('');
+  const [financialYear, setFinancialYear] = useState<string>('');
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(20);
   const queryClient = useQueryClient();
 
-  const { data: invoices, isLoading } = useQuery<Invoice[]>({
-    queryKey: ['invoices', branchId, statusFilter],
+  // Calculate date range from financial year
+  const getDateRange = () => {
+    if (!financialYear) return { from_date: undefined, to_date: undefined };
+    const [startYear] = financialYear.split('-');
+    return {
+      from_date: `${startYear}-04-01`,
+      to_date: `${parseInt(startYear) + 1}-03-31`,
+    };
+  };
+
+  const { data: invoiceData, isLoading } = useQuery<PaginatedInvoiceResponse>({
+    queryKey: ['invoices', branchId, statusFilter, financialYear, page, pageSize],
     queryFn: async () => {
-      const params: Record<string, unknown> = {};
+      const params: Record<string, unknown> = {
+        page,
+        page_size: pageSize,
+      };
       if (branchId) params.branch_id = branchId;
       if (statusFilter) params.status_filter = statusFilter;
+      const dateRange = getDateRange();
+      if (dateRange.from_date) params.from_date = dateRange.from_date;
+      if (dateRange.to_date) params.to_date = dateRange.to_date;
       const response = await invoiceApi.getAll(params);
-      // Handle paginated response
-      return response?.items || [];
+      return response as PaginatedInvoiceResponse;
     },
   });
+
+  const invoices = invoiceData?.items || [];
+  const totalRecords = invoiceData?.total || 0;
+  const totalPages = invoiceData?.pages || 1;
 
   const handleExport = () => {
     if (!filteredInvoices || filteredInvoices.length === 0) {
@@ -82,11 +113,27 @@ export function Invoices() {
     },
   });
 
-  const filteredInvoices = (invoices || []).filter((invoice) =>
+  const filteredInvoices = invoices.filter((invoice) =>
     invoice.invoice_number.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    invoice.client?.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    invoice.vendor?.name.toLowerCase().includes(searchTerm.toLowerCase())
+    invoice.client?.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    invoice.vendor?.name?.toLowerCase().includes(searchTerm.toLowerCase())
   );
+
+  // Reset page when filters change
+  const handleBranchChange = (value: number | string) => {
+    setBranchId(value);
+    setPage(1);
+  };
+
+  const handleStatusChange = (value: string) => {
+    setStatusFilter(value);
+    setPage(1);
+  };
+
+  const handleFinancialYearChange = (value: string) => {
+    setFinancialYear(value);
+    setPage(1);
+  };
 
   const getStatusColor = (status: string) => {
     const colors: Record<string, string> = {
@@ -127,11 +174,19 @@ export function Invoices() {
 
       <Card>
         <CardHeader>
-          <div className="flex gap-4">
+          <div className="flex gap-4 flex-wrap">
             <div className="w-48">
               <BranchSelector
                 value={branchId}
-                onChange={setBranchId}
+                onChange={handleBranchChange}
+                label=""
+                required={false}
+              />
+            </div>
+            <div className="w-40">
+              <FinancialYearSelector
+                value={financialYear}
+                onChange={handleFinancialYearChange}
                 label=""
                 required={false}
               />
@@ -139,7 +194,7 @@ export function Invoices() {
             <div className="w-40">
               <select
                 value={statusFilter}
-                onChange={(e) => setStatusFilter(e.target.value)}
+                onChange={(e) => handleStatusChange(e.target.value)}
                 className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm"
               >
                 <option value="">All Statuses</option>
@@ -151,7 +206,7 @@ export function Invoices() {
                 <option value="CANCELLED">Cancelled</option>
               </select>
             </div>
-            <div className="relative flex-1">
+            <div className="relative flex-1 min-w-[200px]">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
               <Input
                 type="text"
@@ -262,6 +317,79 @@ export function Invoices() {
                   ))}
                 </tbody>
               </table>
+            </div>
+          )}
+
+          {/* Pagination Controls */}
+          {!isLoading && totalRecords > 0 && (
+            <div className="flex items-center justify-between border-t border-gray-200 bg-gray-50 px-4 py-3 mt-4 rounded-b-lg">
+              <div className="flex items-center gap-4">
+                <span className="text-sm text-gray-700">
+                  Showing{' '}
+                  <span className="font-medium">{(page - 1) * pageSize + 1}</span>
+                  {' '}-{' '}
+                  <span className="font-medium">
+                    {Math.min(page * pageSize, totalRecords)}
+                  </span>
+                  {' '}of{' '}
+                  <span className="font-medium">{totalRecords}</span> invoices
+                </span>
+                <div className="flex items-center gap-2">
+                  <span className="text-sm text-gray-600">Per page:</span>
+                  <select
+                    value={pageSize}
+                    onChange={(e) => {
+                      setPageSize(Number(e.target.value));
+                      setPage(1);
+                    }}
+                    className="border border-gray-300 rounded px-2 py-1 text-sm"
+                  >
+                    <option value={10}>10</option>
+                    <option value={20}>20</option>
+                    <option value={50}>50</option>
+                    <option value={100}>100</option>
+                  </select>
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setPage(1)}
+                  disabled={page === 1}
+                >
+                  First
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setPage(page - 1)}
+                  disabled={page === 1}
+                >
+                  <ChevronLeft className="h-4 w-4" />
+                  Previous
+                </Button>
+                <span className="text-sm text-gray-700 px-2">
+                  Page {page} of {totalPages}
+                </span>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setPage(page + 1)}
+                  disabled={page >= totalPages}
+                >
+                  Next
+                  <ChevronRight className="h-4 w-4" />
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setPage(totalPages)}
+                  disabled={page >= totalPages}
+                >
+                  Last
+                </Button>
+              </div>
             </div>
           )}
         </CardContent>

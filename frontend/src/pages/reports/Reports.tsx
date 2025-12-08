@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { TrendingUp, TrendingDown, FileText, DollarSign, Loader2 } from 'lucide-react';
 import { Card, CardContent, CardHeader } from '../../components/ui/Card';
@@ -60,6 +60,19 @@ export function Reports() {
     to: new Date().toISOString().split('T')[0],
   });
   const [balanceSheetDate, setBalanceSheetDate] = useState<string>(new Date().toISOString().split('T')[0]);
+
+  // Update dateRange when financialYear changes
+  useEffect(() => {
+    if (financialYear) {
+      const [startYear] = financialYear.split('-');
+      setDateRange({
+        from: `${startYear}-04-01`,
+        to: `${parseInt(startYear) + 1}-03-31`,
+      });
+      // Also update balance sheet date to end of financial year
+      setBalanceSheetDate(`${parseInt(startYear) + 1}-03-31`);
+    }
+  }, [financialYear]);
 
   const { data: stats, isLoading } = useQuery<DashboardStats>({
     queryKey: ['dashboard-stats', branchId, financialYear],

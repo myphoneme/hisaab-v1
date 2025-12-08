@@ -9,11 +9,13 @@ import { Input } from '../../components/ui/Input';
 import { BranchSelector } from '../../components/ui/BranchSelector';
 import { FileUpload } from '../../components/ui/FileUpload';
 import { AttachmentList } from '../../components/invoices/AttachmentList';
-import { invoiceApi, clientApi, vendorApi, invoiceAttachmentApi, stateApi, bankAccountApi } from '../../services/api';
-import type { Client, Vendor, Invoice, InvoiceAttachment, State, BankAccount } from '../../types';
+import { invoiceApi, clientApi, vendorApi, invoiceAttachmentApi, stateApi, bankAccountApi, itemApi } from '../../services/api';
+import type { Client, Vendor, Invoice, InvoiceAttachment, State, BankAccount, Item } from '../../types';
 
 interface InvoiceItem {
   serial_no: number;
+  item_id?: number;  // Reference to Item master
+  item_name?: string;  // Display name from Item master
   description: string;
   hsn_sac: string;
   quantity: number;
@@ -221,6 +223,15 @@ export function InvoiceForm() {
     },
   });
 
+  // Fetch items from Item Master
+  const { data: items = [] } = useQuery<Item[]>({
+    queryKey: ['items-active'],
+    queryFn: async () => {
+      const response = await itemApi.getActive();
+      return response || [];
+    },
+  });
+
   const createMutation = useMutation({
     mutationFn: (data: InvoiceFormData) => invoiceApi.create(data),
     onSuccess: () => {
@@ -261,6 +272,36 @@ export function InvoiceForm() {
   const handleItemChange = (index: number, field: keyof InvoiceItem, value: any) => {
     const updatedItems = [...formData.items];
     updatedItems[index] = { ...updatedItems[index], [field]: value };
+    setFormData((prev) => ({ ...prev, items: updatedItems }));
+  };
+
+  // Handle item selection from master - auto-populate fields
+  const handleItemSelect = (index: number, itemId: number | undefined) => {
+    const updatedItems = [...formData.items];
+
+    if (itemId) {
+      const selectedItem = items.find(item => item.id === itemId);
+      if (selectedItem) {
+        updatedItems[index] = {
+          ...updatedItems[index],
+          item_id: selectedItem.id,
+          item_name: selectedItem.name,
+          description: selectedItem.description || selectedItem.name,
+          hsn_sac: selectedItem.hsn_sac || '',
+          unit: selectedItem.default_unit || 'NOS',
+          rate: Number(selectedItem.default_rate) || 0,
+          gst_rate: Number(selectedItem.default_gst_rate) || 18,
+        };
+      }
+    } else {
+      // Clear item selection
+      updatedItems[index] = {
+        ...updatedItems[index],
+        item_id: undefined,
+        item_name: undefined,
+      };
+    }
+
     setFormData((prev) => ({ ...prev, items: updatedItems }));
   };
 
@@ -556,7 +597,22 @@ export function InvoiceForm() {
                   key={index}
                   className="grid grid-cols-12 gap-2 items-start border-b pb-4"
                 >
-                  <div className="col-span-3">
+                  <div className="col-span-2">
+                    <label className="text-xs text-gray-500">Item Name</label>
+                    <select
+                      className="w-full border border-gray-300 rounded-md px-2 py-2 text-sm"
+                      value={item.item_id || ''}
+                      onChange={(e) => handleItemSelect(index, e.target.value ? Number(e.target.value) : undefined)}
+                    >
+                      <option value="">-- Select Item --</option>
+                      {items.map((masterItem) => (
+                        <option key={masterItem.id} value={masterItem.id}>
+                          {masterItem.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="col-span-2">
                     <label className="text-xs text-gray-500">Description *</label>
                     <Input
                       value={item.description}
@@ -637,13 +693,13 @@ export function InvoiceForm() {
                       max="100"
                     />
                   </div>
-                  <div className="col-span-2">
+                  <div className="col-span-1">
                     <label className="text-xs text-gray-500">Amount</label>
-                    <div className="font-medium text-gray-900 py-2">
+                    <div className="font-medium text-gray-900 py-2 text-right text-sm">
                       ₹{calculateItemAmount(item).toFixed(2)}
                     </div>
                   </div>
-                  <div className="col-span-1 flex items-end justify-end">
+                  <div className="col-span-1 flex items-end justify-center">
                     <Button
                       type="button"
                       variant="outline"

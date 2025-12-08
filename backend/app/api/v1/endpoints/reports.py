@@ -249,11 +249,12 @@ async def get_gst_summary(
 async def get_tds_summary(
     from_date: date = Query(...),
     to_date: date = Query(...),
+    branch_id: Optional[int] = None,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
     """Get TDS summary for a period."""
-    result = await db.execute(
+    query = (
         select(
             Invoice.tds_section,
             func.count().label('count'),
@@ -263,8 +264,14 @@ async def get_tds_summary(
         .where(Invoice.tds_applicable == True)
         .where(Invoice.invoice_date >= from_date)
         .where(Invoice.invoice_date <= to_date)
-        .group_by(Invoice.tds_section)
     )
+
+    if branch_id:
+        query = query.where(Invoice.branch_id == branch_id)
+
+    query = query.group_by(Invoice.tds_section)
+
+    result = await db.execute(query)
     rows = result.all()
 
     summary = []
