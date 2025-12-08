@@ -1,65 +1,26 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Edit, Printer, Send, XCircle, Paperclip } from 'lucide-react';
+import { ArrowLeft, Edit, Printer, Send, FileCheck, XCircle } from 'lucide-react';
 import { useState } from 'react';
 import { toast } from 'sonner';
-import { invoiceApi, settingsApi, paymentApi, invoiceAttachmentApi } from '../../services/api';
+import { proformaInvoiceApi, settingsApi } from '../../services/api';
 import { Button } from '../../components/ui/Button';
-import { Card, CardContent, CardHeader } from '../../components/ui/Card';
-import { AttachmentList } from '../../components/invoices/AttachmentList';
+import { Card, CardContent } from '../../components/ui/Card';
 import { formatCurrency } from '../../lib/utils';
-import type { Invoice, CompanySettings, Payment, InvoiceAttachment } from '../../types';
+import type { ProformaInvoice, CompanySettings } from '../../types';
 
-export function InvoiceView() {
+export function ProformaInvoiceView() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [showSendConfirm, setShowSendConfirm] = useState(false);
+  const [showGenerateConfirm, setShowGenerateConfirm] = useState(false);
   const [showCancelConfirm, setShowCancelConfirm] = useState(false);
 
-  // Status update mutation
-  const statusMutation = useMutation({
-    mutationFn: ({ invoiceId, status }: { invoiceId: number; status: string }) =>
-      invoiceApi.updateStatus(invoiceId, status),
-    onSuccess: (_, variables) => {
-      queryClient.invalidateQueries({ queryKey: ['invoice', id] });
-      queryClient.invalidateQueries({ queryKey: ['invoices'] });
-      setShowSendConfirm(false);
-      setShowCancelConfirm(false);
-      if (variables.status === 'SENT') {
-        toast.success('Invoice sent and posted to ledger');
-      } else if (variables.status === 'CANCELLED') {
-        toast.success('Invoice cancelled');
-      }
-    },
-    onError: (error: any) => {
-      const detail = error.response?.data?.detail;
-      let msg = 'Failed to update invoice status';
-      if (typeof detail === 'string') {
-        msg = detail;
-      } else if (Array.isArray(detail) && detail.length > 0) {
-        msg = detail[0]?.msg || msg;
-      }
-      toast.error(msg);
-    },
-  });
-
-  const handleSendInvoice = () => {
-    if (id) {
-      statusMutation.mutate({ invoiceId: Number(id), status: 'SENT' });
-    }
-  };
-
-  const handleCancelInvoice = () => {
-    if (id) {
-      statusMutation.mutate({ invoiceId: Number(id), status: 'CANCELLED' });
-    }
-  };
-
-  // Fetch invoice data
-  const { data: invoice, isLoading } = useQuery<Invoice>({
-    queryKey: ['invoice', id],
-    queryFn: () => invoiceApi.getById(Number(id)),
+  // Fetch PI data
+  const { data: pi, isLoading } = useQuery<ProformaInvoice>({
+    queryKey: ['proforma-invoice', id],
+    queryFn: () => proformaInvoiceApi.getById(Number(id)),
     enabled: !!id,
   });
 
@@ -69,36 +30,57 @@ export function InvoiceView() {
     queryFn: () => settingsApi.get(),
   });
 
-  // Fetch payments for this invoice
-  const { data: paymentsData } = useQuery({
-    queryKey: ['payments', 'invoice', id],
-    queryFn: async () => {
-      const response = await paymentApi.getAll();
-      const payments = response?.items || [];
-      return payments.filter((p: Payment) => p.invoice_id === Number(id));
+  // Status update mutation
+  const statusMutation = useMutation({
+    mutationFn: ({ piId, status }: { piId: number; status: string }) =>
+      proformaInvoiceApi.updateStatus(piId, status),
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: ['proforma-invoice', id] });
+      queryClient.invalidateQueries({ queryKey: ['proforma-invoices'] });
+      setShowSendConfirm(false);
+      setShowCancelConfirm(false);
+      if (variables.status === 'SENT') {
+        toast.success('Proforma Invoice sent');
+      } else if (variables.status === 'CANCELLED') {
+        toast.success('Proforma Invoice cancelled');
+      }
     },
-    enabled: !!id,
+    onError: (error: Error & { response?: { data?: { detail?: string } } }) => {
+      toast.error(error.response?.data?.detail || 'Failed to update status');
+    },
   });
 
-  const payments = paymentsData as Payment[] | undefined;
-
-  // Fetch attachments for this invoice
-  const { data: attachmentsData } = useQuery({
-    queryKey: ['invoice-attachments', id],
-    queryFn: async () => {
-      const response = await invoiceAttachmentApi.list(Number(id));
-      return response;
+  // Generate Invoice mutation
+  const generateInvoiceMutation = useMutation({
+    mutationFn: (piId: number) => proformaInvoiceApi.generateInvoice(piId),
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ['proforma-invoice', id] });
+      queryClient.invalidateQueries({ queryKey: ['proforma-invoices'] });
+      queryClient.invalidateQueries({ queryKey: ['invoices'] });
+      setShowGenerateConfirm(false);
+      toast.success(`Invoice ${data.invoice_number} generated successfully`);
+      navigate(`/invoices/${data.invoice_id}`);
     },
-    enabled: !!id,
+    onError: (error: Error & { response?: { data?: { detail?: string } } }) => {
+      toast.error(error.response?.data?.detail || 'Failed to generate invoice');
+    },
   });
 
-  const attachments = (attachmentsData as { attachments: InvoiceAttachment[] })?.attachments || [];
+  const handleSendPI = () => {
+    if (id) {
+      statusMutation.mutate({ piId: Number(id), status: 'SENT' });
+    }
+  };
 
-  const handleDownloadAttachment = async (attachment: InvoiceAttachment) => {
-    try {
-      await invoiceAttachmentApi.download(Number(id), attachment.id, attachment.filename);
-    } catch {
-      toast.error('Failed to download file');
+  const handleCancelPI = () => {
+    if (id) {
+      statusMutation.mutate({ piId: Number(id), status: 'CANCELLED' });
+    }
+  };
+
+  const handleGenerateInvoice = () => {
+    if (id) {
+      generateInvoiceMutation.mutate(Number(id));
     }
   };
 
@@ -109,61 +91,86 @@ export function InvoiceView() {
   if (isLoading) {
     return (
       <div className="flex items-center justify-center h-64">
-        <p className="text-gray-500">Loading invoice...</p>
+        <p className="text-gray-500">Loading proforma invoice...</p>
       </div>
     );
   }
 
-  if (!invoice) {
+  if (!pi) {
     return (
       <div className="flex items-center justify-center h-64">
-        <p className="text-gray-500">Invoice not found</p>
+        <p className="text-gray-500">Proforma Invoice not found</p>
       </div>
     );
   }
 
-  const party = invoice.invoice_type === 'SALES' ? invoice.client : invoice.vendor;
-  const totalPaid = payments?.reduce((sum, payment) => sum + (payment.net_amount || 0), 0) || 0;
-  const amountDue = invoice.total_amount - totalPaid;
+  const getStatusColor = (status: string) => {
+    const colors: Record<string, string> = {
+      DRAFT: 'bg-gray-100 text-gray-800',
+      SENT: 'bg-blue-100 text-blue-800',
+      GENERATED: 'bg-green-100 text-green-800',
+      CANCELLED: 'bg-red-100 text-red-800',
+    };
+    return colors[status] || 'bg-gray-100 text-gray-800';
+  };
 
   return (
     <div className="space-y-6">
-      {/* Send Invoice Confirmation Modal */}
+      {/* Send PI Confirmation Modal */}
       {showSendConfirm && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-white p-6 rounded-lg shadow-lg max-w-md">
-            <h3 className="text-lg font-semibold mb-4">Send Invoice?</h3>
+            <h3 className="text-lg font-semibold mb-4">Send Proforma Invoice?</h3>
             <p className="text-gray-600 mb-6">
-              This will mark the invoice as SENT and create ledger entries.
-              You won't be able to edit the invoice after sending.
+              This will mark the proforma invoice as SENT.
             </p>
             <div className="flex justify-end gap-3">
               <Button variant="outline" onClick={() => setShowSendConfirm(false)}>
                 Cancel
               </Button>
-              <Button onClick={handleSendInvoice} disabled={statusMutation.isPending}>
-                {statusMutation.isPending ? 'Sending...' : 'Yes, Send Invoice'}
+              <Button onClick={handleSendPI} disabled={statusMutation.isPending}>
+                {statusMutation.isPending ? 'Sending...' : 'Yes, Send PI'}
               </Button>
             </div>
           </div>
         </div>
       )}
 
-      {/* Cancel Invoice Confirmation Modal */}
+      {/* Generate Invoice Confirmation Modal */}
+      {showGenerateConfirm && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white p-6 rounded-lg shadow-lg max-w-md">
+            <h3 className="text-lg font-semibold mb-4">Generate Invoice from PI?</h3>
+            <p className="text-gray-600 mb-6">
+              This will create a new invoice from this proforma invoice.
+              The PI status will be changed to GENERATED and cannot be edited.
+            </p>
+            <div className="flex justify-end gap-3">
+              <Button variant="outline" onClick={() => setShowGenerateConfirm(false)}>
+                Cancel
+              </Button>
+              <Button onClick={handleGenerateInvoice} disabled={generateInvoiceMutation.isPending}>
+                {generateInvoiceMutation.isPending ? 'Generating...' : 'Yes, Generate Invoice'}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Cancel PI Confirmation Modal */}
       {showCancelConfirm && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-white p-6 rounded-lg shadow-lg max-w-md">
-            <h3 className="text-lg font-semibold mb-4">Cancel Invoice?</h3>
+            <h3 className="text-lg font-semibold mb-4">Cancel Proforma Invoice?</h3>
             <p className="text-gray-600 mb-6">
-              This will cancel the invoice and reverse any ledger entries.
-              This action cannot be undone.
+              This will cancel the proforma invoice. This action cannot be undone.
             </p>
             <div className="flex justify-end gap-3">
               <Button variant="outline" onClick={() => setShowCancelConfirm(false)}>
-                No, Keep Invoice
+                No, Keep PI
               </Button>
-              <Button variant="destructive" onClick={handleCancelInvoice} disabled={statusMutation.isPending}>
-                {statusMutation.isPending ? 'Cancelling...' : 'Yes, Cancel Invoice'}
+              <Button variant="destructive" onClick={handleCancelPI} disabled={statusMutation.isPending}>
+                {statusMutation.isPending ? 'Cancelling...' : 'Yes, Cancel PI'}
               </Button>
             </div>
           </div>
@@ -172,98 +179,113 @@ export function InvoiceView() {
 
       {/* Header Actions - Hide on print */}
       <div className="no-print flex justify-between items-center">
-        <Button variant="outline" onClick={() => navigate('/invoices')}>
+        <Button variant="outline" onClick={() => navigate('/proforma-invoices')}>
           <ArrowLeft className="h-4 w-4 mr-2" />
-          Back to Invoices
+          Back to Proforma Invoices
         </Button>
         <div className="flex gap-3">
-          {/* Send Invoice Button - Only visible for DRAFT status */}
-          {invoice.status === 'DRAFT' && (
+          {/* Send PI Button - Only for DRAFT status */}
+          {pi.status === 'DRAFT' && (
             <Button
               className="bg-blue-600 hover:bg-blue-700"
               onClick={() => setShowSendConfirm(true)}
             >
               <Send className="h-4 w-4 mr-2" />
-              Send Invoice
+              Send PI
             </Button>
           )}
 
-          {/* Cancel Invoice Button - Visible for DRAFT, SENT, PARTIAL statuses */}
-          {['DRAFT', 'SENT', 'PARTIAL'].includes(invoice.status) && (
+          {/* Generate Invoice Button - For DRAFT and SENT */}
+          {(pi.status === 'DRAFT' || pi.status === 'SENT') && (
+            <Button
+              className="bg-green-600 hover:bg-green-700"
+              onClick={() => setShowGenerateConfirm(true)}
+            >
+              <FileCheck className="h-4 w-4 mr-2" />
+              Generate Invoice
+            </Button>
+          )}
+
+          {/* Cancel Button - For DRAFT and SENT */}
+          {(pi.status === 'DRAFT' || pi.status === 'SENT') && (
             <Button
               variant="destructive"
               onClick={() => setShowCancelConfirm(true)}
             >
               <XCircle className="h-4 w-4 mr-2" />
-              Cancel Invoice
+              Cancel PI
             </Button>
           )}
 
           <Button variant="outline" onClick={handlePrint}>
             <Printer className="h-4 w-4 mr-2" />
-            Print Invoice
+            Print PI
           </Button>
 
-          {/* Edit Button - Only visible for DRAFT status */}
-          {invoice.status === 'DRAFT' && (
-            <Button onClick={() => navigate(`/invoices/${invoice.id}/edit`)}>
+          {/* Edit Button - Only for DRAFT status */}
+          {pi.status === 'DRAFT' && (
+            <Button onClick={() => navigate(`/proforma-invoices/${pi.id}/edit`)}>
               <Edit className="h-4 w-4 mr-2" />
-              Edit Invoice
+              Edit PI
             </Button>
           )}
         </div>
       </div>
 
-      {/* Invoice Container */}
+      {/* PI Container */}
       <Card className="invoice-container">
         <CardContent className="p-8">
           {/* Logo at Top */}
           {settings?.company_logo && (
-            <div className="mb-6">
+            <div className="mb-4">
               <img
                 src={settings.company_logo}
                 alt="Company Logo"
-                className="h-20 object-contain"
+                className="h-12 object-contain"
               />
             </div>
           )}
 
-          {/* Invoice Header */}
+          {/* PI Header */}
           <div className="flex justify-between items-start mb-8">
             <div>
-              <h1 className="text-3xl font-bold text-gray-900 mb-2">{invoice.invoice_type} INVOICE</h1>
+              <h1 className="text-3xl font-bold text-gray-900 mb-2">PROFORMA INVOICE</h1>
               <p className="text-sm text-gray-600">
-                <span className="font-medium">Invoice Number:</span> {invoice.invoice_number}
+                <span className="font-medium">PI Number:</span> {pi.pi_number}
               </p>
               <p className="text-sm text-gray-600">
-                <span className="font-medium">Date:</span> {new Date(invoice.invoice_date).toLocaleDateString()}
+                <span className="font-medium">Date:</span> {new Date(pi.pi_date).toLocaleDateString('en-IN')}
               </p>
-              {invoice.due_date && (
+              {pi.due_date && (
                 <p className="text-sm text-gray-600">
-                  <span className="font-medium">Due Date:</span> {new Date(invoice.due_date).toLocaleDateString()}
+                  <span className="font-medium">Due Date:</span> {new Date(pi.due_date).toLocaleDateString('en-IN')}
+                </p>
+              )}
+              {pi.valid_until && (
+                <p className="text-sm text-gray-600">
+                  <span className="font-medium">Valid Until:</span> {new Date(pi.valid_until).toLocaleDateString('en-IN')}
                 </p>
               )}
             </div>
             <div className="text-right">
-              <span
-                className={`inline-block px-3 py-1 text-sm font-semibold rounded-full ${
-                  invoice.status === 'PAID'
-                    ? 'bg-green-100 text-green-800'
-                    : invoice.status === 'DRAFT'
-                    ? 'bg-gray-100 text-gray-800'
-                    : invoice.status === 'SENT'
-                    ? 'bg-blue-100 text-blue-800'
-                    : invoice.status === 'OVERDUE'
-                    ? 'bg-red-100 text-red-800'
-                    : 'bg-yellow-100 text-yellow-800'
-                }`}
-              >
-                {invoice.status}
+              <span className={`inline-block px-3 py-1 text-sm font-semibold rounded-full ${getStatusColor(pi.status)}`}>
+                {pi.status}
               </span>
+              {pi.invoice_id && (
+                <p className="text-sm text-gray-600 mt-2">
+                  <span className="font-medium">Invoice Generated:</span>{' '}
+                  <button
+                    onClick={() => navigate(`/invoices/${pi.invoice_id}`)}
+                    className="text-blue-600 hover:underline"
+                  >
+                    View Invoice
+                  </button>
+                </p>
+              )}
             </div>
           </div>
 
-          {/* Company & Party Details */}
+          {/* Company & Client Details */}
           <div className="grid grid-cols-2 gap-8 mb-8 pb-8 border-b">
             {/* Company Details (From) */}
             <div>
@@ -280,38 +302,38 @@ export function InvoiceView() {
               </div>
             </div>
 
-            {/* Party Details (To) */}
+            {/* Client Details (To) */}
             <div>
-              <h3 className="text-sm font-semibold text-gray-700 mb-2">
-                {invoice.invoice_type === 'SALES' ? 'BILL TO:' : 'BILL FROM:'}
-              </h3>
+              <h3 className="text-sm font-semibold text-gray-700 mb-2">BILL TO:</h3>
               <div className="text-sm">
-                <p className="font-bold text-gray-900">{party?.name}</p>
-                <p className="text-gray-600">{party?.address}</p>
+                <p className="font-bold text-gray-900">{pi.client?.name}</p>
+                <p className="text-gray-600">{pi.client?.address}</p>
                 <p className="text-gray-600">
-                  {party?.city}, {party?.state} {party?.pincode}
+                  {pi.client?.city}, {pi.client?.state} {pi.client?.pincode}
                 </p>
-                {party?.gstin && <p className="text-gray-600">GSTIN: {party.gstin}</p>}
-                <p className="text-gray-600">Email: {party?.email}</p>
-                <p className="text-gray-600">Phone: {party?.phone}</p>
+                {pi.client?.gstin && <p className="text-gray-600">GSTIN: {pi.client.gstin}</p>}
+                <p className="text-gray-600">Email: {pi.client?.email}</p>
+                <p className="text-gray-600">Phone: {pi.client?.phone}</p>
               </div>
             </div>
           </div>
 
-          {/* Invoice Metadata */}
+          {/* PI Metadata */}
           <div className="grid grid-cols-3 gap-4 mb-6 text-sm">
             <div>
-              <p className="text-gray-600">Invoice Type</p>
-              <p className="font-medium">{invoice.invoice_type}</p>
-            </div>
-            <div>
               <p className="text-gray-600">Place of Supply</p>
-              <p className="font-medium">{invoice.place_of_supply}</p>
+              <p className="font-medium">{pi.place_of_supply}</p>
             </div>
-            {invoice.po && (
+            {pi.branch && (
               <div>
-                <p className="text-gray-600">PO Reference</p>
-                <p className="font-medium">{invoice.po.po_number}</p>
+                <p className="text-gray-600">Branch</p>
+                <p className="font-medium">{pi.branch.name}</p>
+              </div>
+            )}
+            {pi.reverse_charge && (
+              <div>
+                <p className="text-gray-600">Reverse Charge</p>
+                <p className="font-medium">Yes</p>
               </div>
             )}
           </div>
@@ -335,13 +357,13 @@ export function InvoiceView() {
                   </tr>
                 </thead>
                 <tbody>
-                  {invoice.items?.map((item, index) => {
+                  {pi.items?.map((item, index) => {
                     const itemAmount = Number(item.quantity) * Number(item.rate);
                     const gstAmount = Number(item.cgst_amount || 0) + Number(item.sgst_amount || 0) + Number(item.igst_amount || 0);
 
                     return (
-                      <tr key={item.id} className="border-b">
-                        <td className="px-3 py-2">{index + 1}</td>
+                      <tr key={item.id || index} className="border-b">
+                        <td className="px-3 py-2">{item.serial_no || index + 1}</td>
                         <td className="px-3 py-2">
                           <p className="font-medium">{item.description}</p>
                         </td>
@@ -368,118 +390,77 @@ export function InvoiceView() {
               <div className="space-y-2 text-sm">
                 <div className="flex justify-between">
                   <span className="text-gray-600">Subtotal:</span>
-                  <span className="font-medium">{formatCurrency(invoice.subtotal)}</span>
+                  <span className="font-medium">{formatCurrency(pi.subtotal)}</span>
                 </div>
 
-                {invoice.is_interstate ? (
+                {pi.discount_amount > 0 && (
+                  <div className="flex justify-between">
+                    <span className="text-gray-600">Discount ({pi.discount_percent}%):</span>
+                    <span className="font-medium">- {formatCurrency(pi.discount_amount)}</span>
+                  </div>
+                )}
+
+                {pi.is_igst ? (
                   <div className="flex justify-between">
                     <span className="text-gray-600">IGST:</span>
-                    <span className="font-medium">{formatCurrency(invoice.igst_amount || 0)}</span>
+                    <span className="font-medium">{formatCurrency(pi.igst_amount || 0)}</span>
                   </div>
                 ) : (
                   <>
                     <div className="flex justify-between">
                       <span className="text-gray-600">CGST:</span>
-                      <span className="font-medium">{formatCurrency(invoice.cgst_amount || 0)}</span>
+                      <span className="font-medium">{formatCurrency(pi.cgst_amount || 0)}</span>
                     </div>
                     <div className="flex justify-between">
                       <span className="text-gray-600">SGST:</span>
-                      <span className="font-medium">{formatCurrency(invoice.sgst_amount || 0)}</span>
+                      <span className="font-medium">{formatCurrency(pi.sgst_amount || 0)}</span>
                     </div>
                   </>
                 )}
 
-                {invoice.cess_amount > 0 && (
+                {pi.cess_amount > 0 && (
                   <div className="flex justify-between">
                     <span className="text-gray-600">CESS:</span>
-                    <span className="font-medium">{formatCurrency(invoice.cess_amount)}</span>
+                    <span className="font-medium">{formatCurrency(pi.cess_amount)}</span>
                   </div>
                 )}
 
-                {invoice.tds_amount > 0 && (
+                {pi.tds_amount > 0 && (
                   <div className="flex justify-between text-red-600">
-                    <span>TDS Deduction:</span>
-                    <span className="font-medium">- {formatCurrency(invoice.tds_amount)}</span>
+                    <span>TDS Deduction ({pi.tds_rate}%):</span>
+                    <span className="font-medium">- {formatCurrency(pi.tds_amount)}</span>
                   </div>
                 )}
 
-                {invoice.tcs_amount > 0 && (
+                {pi.tcs_amount > 0 && (
                   <div className="flex justify-between text-green-600">
-                    <span>TCS:</span>
-                    <span className="font-medium">+ {formatCurrency(invoice.tcs_amount)}</span>
+                    <span>TCS ({pi.tcs_rate}%):</span>
+                    <span className="font-medium">+ {formatCurrency(pi.tcs_amount)}</span>
                   </div>
                 )}
 
                 <div className="border-t pt-2 flex justify-between text-lg font-bold">
                   <span>Total Amount:</span>
-                  <span>{formatCurrency(invoice.total_amount)}</span>
+                  <span>{formatCurrency(pi.total_amount)}</span>
                 </div>
-
-                {totalPaid > 0 && (
-                  <>
-                    <div className="flex justify-between text-green-600">
-                      <span>Amount Paid:</span>
-                      <span className="font-medium">- {formatCurrency(totalPaid)}</span>
-                    </div>
-                    <div className="flex justify-between text-lg font-bold text-red-600">
-                      <span>Amount Due:</span>
-                      <span>{formatCurrency(amountDue)}</span>
-                    </div>
-                  </>
-                )}
               </div>
             </div>
           </div>
 
-          {/* Payment Information */}
-          {payments && payments.length > 0 && (
-            <div className="mt-8 pt-6 border-t">
-              <h3 className="text-lg font-semibold mb-3">Payment History</h3>
-              <div className="space-y-2 text-sm">
-                {payments.map((payment) => (
-                  <div key={payment.id} className="flex justify-between items-center bg-gray-50 p-3 rounded">
-                    <div>
-                      <p className="font-medium">{payment.payment_number}</p>
-                      <p className="text-gray-600">
-                        {new Date(payment.payment_date).toLocaleDateString()} - {payment.payment_mode}
-                      </p>
-                    </div>
-                    <span className="font-semibold">{formatCurrency(payment.net_amount)}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* Attachments */}
-          {attachments.length > 0 && (
-            <div className="mt-8 pt-6 border-t no-print">
-              <h3 className="text-lg font-semibold mb-3 flex items-center gap-2">
-                <Paperclip className="h-5 w-5" />
-                Attachments ({attachments.length})
-              </h3>
-              <AttachmentList
-                attachments={attachments}
-                onDownload={handleDownloadAttachment}
-                canDelete={false}
-              />
-            </div>
-          )}
-
           {/* Notes & Terms */}
-          {(invoice.notes || settings?.invoice_terms) && (
+          {(pi.notes || pi.terms_conditions || settings?.invoice_terms) && (
             <div className="mt-8 pt-6 border-t">
               <div className="grid grid-cols-2 gap-8 text-sm">
-                {invoice.notes && (
+                {pi.notes && (
                   <div>
                     <h3 className="font-semibold mb-2">Notes:</h3>
-                    <p className="text-gray-600 whitespace-pre-line">{invoice.notes}</p>
+                    <p className="text-gray-600 whitespace-pre-line">{pi.notes}</p>
                   </div>
                 )}
-                {settings?.invoice_terms && (
+                {(pi.terms_conditions || settings?.invoice_terms) && (
                   <div>
                     <h3 className="font-semibold mb-2">Terms & Conditions:</h3>
-                    <p className="text-gray-600 whitespace-pre-line">{settings.invoice_terms}</p>
+                    <p className="text-gray-600 whitespace-pre-line">{pi.terms_conditions || settings?.invoice_terms}</p>
                   </div>
                 )}
               </div>
@@ -487,37 +468,37 @@ export function InvoiceView() {
           )}
 
           {/* Bank Account Details */}
-          {invoice.bank_account && (
+          {pi.bank_account && (
             <div className="mt-8 pt-6 border-t">
               <h3 className="text-lg font-semibold mb-3">Bank Details for Payment</h3>
               <div className="bg-gray-50 p-4 rounded-lg text-sm">
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <p className="text-gray-600">Account Name</p>
-                    <p className="font-medium">{invoice.bank_account.account_name}</p>
+                    <p className="font-medium">{pi.bank_account.account_name}</p>
                   </div>
                   <div>
                     <p className="text-gray-600">Bank Name</p>
-                    <p className="font-medium">{invoice.bank_account.bank_name}</p>
+                    <p className="font-medium">{pi.bank_account.bank_name}</p>
                   </div>
                   <div>
                     <p className="text-gray-600">Account Number</p>
-                    <p className="font-medium">{invoice.bank_account.account_number}</p>
+                    <p className="font-medium">{pi.bank_account.account_number}</p>
                   </div>
                   <div>
                     <p className="text-gray-600">IFSC Code</p>
-                    <p className="font-medium">{invoice.bank_account.ifsc_code}</p>
+                    <p className="font-medium">{pi.bank_account.ifsc_code}</p>
                   </div>
-                  {invoice.bank_account.branch_name && (
+                  {pi.bank_account.branch_name && (
                     <div>
                       <p className="text-gray-600">Branch</p>
-                      <p className="font-medium">{invoice.bank_account.branch_name}</p>
+                      <p className="font-medium">{pi.bank_account.branch_name}</p>
                     </div>
                   )}
-                  {invoice.bank_account.upi_id && (
+                  {pi.bank_account.upi_id && (
                     <div>
                       <p className="text-gray-600">UPI ID</p>
-                      <p className="font-medium">{invoice.bank_account.upi_id}</p>
+                      <p className="font-medium">{pi.bank_account.upi_id}</p>
                     </div>
                   )}
                 </div>
@@ -572,6 +553,12 @@ export function InvoiceView() {
             background-color: #f9fafb !important;
             -webkit-print-color-adjust: exact;
             print-color-adjust: exact;
+          }
+          /* Hide React Query Devtools */
+          .tsqd-parent-container,
+          [class*="ReactQueryDevtools"],
+          [data-reactquerydevtools] {
+            display: none !important;
           }
         }
       `}</style>

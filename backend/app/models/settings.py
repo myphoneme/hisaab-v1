@@ -50,6 +50,12 @@ class CompanySettings(BaseModel):
     invoice_terms = Column(Text, nullable=True)
     invoice_notes = Column(Text, nullable=True)
 
+    # Proforma Invoice Settings
+    pi_terms = Column(Text, nullable=True)
+
+    # Purchase Order Settings
+    purchase_order_terms = Column(Text, nullable=True)
+
     # System Settings
     enable_multi_currency = Column(Boolean, default=False, nullable=False)
     enable_inventory = Column(Boolean, default=False, nullable=False)

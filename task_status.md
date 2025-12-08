@@ -108,6 +108,78 @@ Files cleaned:
 
 ---
 
+## Bug Fixes (Session 3 - December 8, 2025)
+
+| # | Bug | Root Cause | Fix Applied |
+|---|-----|------------|-------------|
+| 1 | SQLAlchemy relationship error (Invoice ↔ BillingSchedule) | Multiple FK paths, back_populates conflict | Removed back_populates, added foreign_keys parameter |
+| 2 | NaN in invoice total from Client PO | JavaScript treating Decimal as strings | Used Number() conversion and item.total_amount from backend |
+| 3 | Billing schedule generating 13 instead of 12 entries | Loop condition `<= end_date` inclusive | Changed to `< end_date` (exclusive) |
+| 4 | Invoice Update 500 Error (MissingGreenlet) | bank_account relationship not eagerly loaded | Added selectinload(Invoice.bank_account) to all queries |
+| 5 | TDS Summary not filtering by Financial Year | dateRange not updating when FY changes | Added useEffect to sync dateRange with financialYear |
+| 6 | TDS Summary not filtering by Branch | Backend missing branch_id parameter | Added branch_id filter to TDS summary endpoint |
+
+## Enhancements (Session 3 - December 8, 2025)
+
+| # | Enhancement | Files Modified |
+|---|-------------|----------------|
+| 1 | Invoice pagination | `frontend/src/pages/invoices/Invoices.tsx` |
+| 2 | Invoice Financial Year filter | `frontend/src/pages/invoices/Invoices.tsx` |
+| 3 | Item Master integration in Invoice Form | `frontend/src/pages/invoices/InvoiceForm.tsx` |
+
+---
+
+## Current Sprint (December 8, 2025) - In Progress
+
+### Topic 1: Client PO Module Improvements
+| # | Task | Status | Details |
+|---|------|--------|---------|
+| 1.1 | PO Number Pattern | Pending | `PO/2025-26/12/0001` - Auto-increment, reset monthly |
+| 1.2 | Quotation Number Field | Pending | Add optional field |
+| 1.3 | Session Management | Pending | Fix timeout causing form data loss |
+| 1.4 | Default PO Validity | Pending | 2 weeks from creation |
+| 1.5 | Invoice Print - Logo | Pending | Move to top |
+| 1.6 | Invoice Print - Scrollbar | Pending | Hide in print |
+| 1.7 | Invoice Print - Stamp | Pending | Add "For [Company]" + "Director" stamp |
+
+### Topic 2: Revenue Report Module (New)
+| # | Task | Status | Details |
+|---|------|--------|---------|
+| 2.1 | New Module | Pending | Separate "Revenue Report" page |
+| 2.2 | Breadcrumb | Pending | Navigation trail |
+| 2.3 | Filters | Pending | Financial Year + Branch |
+| 2.4 | Widgets | Pending | Transactions, Dues, Payment, Net summary |
+| 2.5 | Collapsible Table | Pending | Month-wise grouping |
+| 2.6 | Expandable Rows | Pending | Show invoices within each month |
+
+### Topic 3: PI (Proforma Invoice) Module (New)
+| # | Task | Status | Details |
+|---|------|--------|---------|
+| 3.1 | PI Database Model | Pending | New proforma_invoices table |
+| 3.2 | PI Number Pattern | Pending | `PI/2025-26/12/0001` |
+| 3.3 | PI Backend API | Pending | CRUD + Generate Invoice endpoint |
+| 3.4 | PI Frontend - List | Pending | List with filters |
+| 3.5 | PI Frontend - Form | Pending | Create/Edit PI |
+| 3.6 | PI Frontend - View | Pending | View/Print PI |
+| 3.7 | Update Client PO | Pending | Create PI instead of Invoice |
+| 3.8 | PI Status Management | Pending | DRAFT → SENT → GENERATED | 
+
+---
+
+## Topics Deferred (Plan Later)
+| # | Topic | Description |
+|---|-------|-------------|
+| 4 | GST - TDS Table | Master table for GST/TDS rates |
+| 5 | Reconciliation | Amount, GST, TDS reconciliation |
+| 6 | GST/TDS Sheet | Form for GST/TDS filing |
+| 7 | Update Challan | Challan management |
+| 8 | Payment Balance | Payment vs balance tracking |
+| 9 | Bank Statement Upload | Bank reconciliation |
+| 10 | Cash Expense Module | Project-wise cash expenses |
+| 11 | Ledger Module | FD accounts, payments |
+
+---
+
 ## Pending Items (Future Enhancements)
 
 | # | Task | Priority |
@@ -119,4 +191,4 @@ Files cleaned:
 
 ---
 
-*Last Updated: December 2, 2025*
+*Last Updated: December 8, 2025*

@@ -39,6 +39,9 @@ import { Items } from './pages/items/Items';
 import { ClientPOs } from './pages/client-pos/ClientPOs';
 import { ClientPOForm } from './pages/client-pos/ClientPOForm';
 import { ClientPOView } from './pages/client-pos/ClientPOView';
+import { ProformaInvoices } from './pages/proforma-invoices/ProformaInvoices';
+import { ProformaInvoiceForm } from './pages/proforma-invoices/ProformaInvoiceForm';
+import { ProformaInvoiceView } from './pages/proforma-invoices/ProformaInvoiceView';
 
 function App() {
   return (
@@ -62,6 +65,10 @@ function App() {
               <Route path="client-pos/new" element={<ClientPOForm />} />
               <Route path="client-pos/:id" element={<ClientPOView />} />
               <Route path="client-pos/:id/edit" element={<ClientPOForm />} />
+              <Route path="proforma-invoices" element={<ProformaInvoices />} />
+              <Route path="proforma-invoices/new" element={<ProformaInvoiceForm />} />
+              <Route path="proforma-invoices/:id" element={<ProformaInvoiceView />} />
+              <Route path="proforma-invoices/:id/edit" element={<ProformaInvoiceForm />} />
               <Route path="purchase-orders" element={<PurchaseOrders />} />
               <Route path="invoices" element={<Invoices />} />
               <Route path="invoices/new" element={<InvoiceForm />} />

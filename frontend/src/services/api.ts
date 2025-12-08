@@ -439,6 +439,17 @@ export const itemApi = {
   delete: (id: number) => api.delete<{ message: string }>(`/items/${id}`),
 };
 
+// Proforma Invoice API
+export const proformaInvoiceApi = {
+  getAll: (params?: Record<string, unknown>) => api.get<PaginatedResponse<ProformaInvoice>>('/proforma-invoices', params),
+  getById: (id: number) => api.get<ProformaInvoice>(`/proforma-invoices/${id}`),
+  create: (data: unknown) => api.post<ProformaInvoice>('/proforma-invoices', data),
+  update: (id: number, data: unknown) => api.patch<ProformaInvoice>(`/proforma-invoices/${id}`, data),
+  updateStatus: (id: number, status: string) => api.patch<ProformaInvoice>(`/proforma-invoices/${id}/status?status_update=${status}`, {}),
+  delete: (id: number) => api.delete<{ message: string }>(`/proforma-invoices/${id}`),
+  generateInvoice: (id: number) => api.post<{ message: string; invoice_id: number; invoice_number: string }>(`/proforma-invoices/${id}/generate-invoice`, {}),
+};
+
 // Client PO API (Sales Orders received from clients)
 export const clientPOApi = {
   getAll: (params?: Record<string, unknown>) => api.get<PaginatedResponse<ClientPO>>('/client-pos', params),
@@ -460,4 +471,7 @@ export const clientPOApi = {
   // Create invoice from schedule
   createInvoiceFromSchedule: (poId: number, scheduleId: number, data?: { invoice_date?: string; due_date?: string; bank_account_id?: number; notes?: string }) =>
     api.post<Invoice>(`/client-pos/${poId}/schedules/${scheduleId}/create-invoice`, data || {}),
+  // Create PI from schedule
+  createPIFromSchedule: (poId: number, scheduleId: number, data?: { invoice_date?: string; due_date?: string; bank_account_id?: number; notes?: string }) =>
+    api.post<ProformaInvoice>(`/client-pos/${poId}/schedules/${scheduleId}/create-pi`, data || {}),
 };

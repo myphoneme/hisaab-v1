@@ -18,6 +18,7 @@ import {
   Package,
   ClipboardList,
   TrendingUp,
+  FileCheck,
 } from 'lucide-react';
 import { cn } from '../../lib/utils';
 
@@ -29,6 +30,7 @@ const navigation = [
   { name: 'Bank Accounts', href: '/bank-accounts', icon: Landmark },
   { name: 'Items', href: '/items', icon: Package },
   { name: 'Client POs', href: '/client-pos', icon: ClipboardList },
+  { name: 'Proforma Invoices', href: '/proforma-invoices', icon: FileCheck },
   { name: 'Purchase Orders', href: '/purchase-orders', icon: ShoppingCart },
   { name: 'Invoices', href: '/invoices', icon: FileText },
   { name: 'Payments', href: '/payments', icon: CreditCard },

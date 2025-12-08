@@ -8,6 +8,7 @@ from app.models.payment import Payment
 from app.models.ledger import LedgerEntry
 from app.models.cash_expense import CashExpense
 from app.models.client_po import ClientPO
+from app.models.proforma_invoice import ProformaInvoice
 
 
 def get_financial_year() -> str:
@@ -161,6 +162,36 @@ async def generate_client_po_number(db: AsyncSession) -> str:
                 )
             )
         ).where(ClientPO.internal_number.like(f"{prefix}%"))
+    )
+    max_num = result.scalar() or 0
+
+    return f"{prefix}{str(max_num + 1).zfill(4)}"
+
+
+async def generate_pi_number(db: AsyncSession, pi_date: datetime = None) -> str:
+    """
+    Generate unique PI number with monthly reset.
+    Format: PI/2024-25/12/0001 (PI/FY/Month/Serial)
+    Serial resets to 1 every month.
+    """
+    if pi_date is None:
+        pi_date = datetime.now()
+
+    fy = get_financial_year()
+    month = str(pi_date.month).zfill(2)  # Two digit month
+    prefix = f"PI/{fy}/{month}/"
+    prefix_len = len(prefix)
+
+    # Get max sequence number for this month
+    result = await db.execute(
+        select(
+            func.max(
+                cast(
+                    func.substr(ProformaInvoice.pi_number, prefix_len + 1),
+                    Integer
+                )
+            )
+        ).where(ProformaInvoice.pi_number.like(f"{prefix}%"))
     )
     max_num = result.scalar() or 0
 

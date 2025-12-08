@@ -155,6 +155,8 @@ export function Settings() {
         invoice_prefix: formData.invoice_prefix || 'INV',
         invoice_terms: formData.invoice_terms,
         invoice_notes: formData.invoice_notes,
+        pi_terms: formData.pi_terms,
+        purchase_order_terms: formData.purchase_order_terms,
         enable_multi_currency: formData.enable_multi_currency || false,
         enable_inventory: formData.enable_inventory || false,
       };
@@ -481,6 +483,33 @@ export function Settings() {
                     rows={4}
                     value={currentData.invoice_terms || ''}
                     onChange={(e) => handleChange('invoice_terms', e.target.value)}
+                    placeholder="Enter default terms and conditions for invoices..."
+                  />
+                </div>
+
+                <div className="md:col-span-2">
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Proforma Invoice Terms & Conditions
+                  </label>
+                  <textarea
+                    className="w-full border border-gray-300 rounded-md px-3 py-2"
+                    rows={4}
+                    value={currentData.pi_terms || ''}
+                    onChange={(e) => handleChange('pi_terms', e.target.value)}
+                    placeholder="Enter default terms and conditions for proforma invoices..."
+                  />
+                </div>
+
+                <div className="md:col-span-2">
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Purchase Order Terms & Conditions
+                  </label>
+                  <textarea
+                    className="w-full border border-gray-300 rounded-md px-3 py-2"
+                    rows={4}
+                    value={currentData.purchase_order_terms || ''}
+                    onChange={(e) => handleChange('purchase_order_terms', e.target.value)}
+                    placeholder="Enter default terms and conditions for purchase orders..."
                   />
                 </div>
 

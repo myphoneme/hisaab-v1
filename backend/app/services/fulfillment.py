@@ -2,6 +2,7 @@
 Fulfillment Service for Client PO -> Invoice workflow
 
 Handles:
+- Creating proforma invoices (PI) from billing schedules
 - Creating invoices from billing schedules
 - Updating billing schedule status
 - Updating ClientPO fulfillment amounts
@@ -15,8 +16,9 @@ from sqlalchemy.orm import selectinload
 from app.models.client_po import ClientPO, ClientPOStatus
 from app.models.billing_schedule import BillingSchedule, ScheduleStatus
 from app.models.invoice import Invoice, InvoiceItem, InvoiceType, InvoiceStatus
+from app.models.proforma_invoice import ProformaInvoice, ProformaInvoiceItem, PIStatus
 from app.models.client import Client
-from app.services.number_generator import generate_invoice_number
+from app.services.number_generator import generate_invoice_number, generate_pi_number
 
 
 async def update_schedule_status(
@@ -221,3 +223,141 @@ async def create_invoice_from_schedule(
     await update_po_fulfillment(db, client_po.id)
 
     return invoice
+
+
+async def create_pi_from_schedule(
+    db: AsyncSession,
+    schedule_id: int,
+    pi_date: date = None,
+    due_date: date = None,
+    bank_account_id: int = None,
+    notes: str = None
+) -> ProformaInvoice:
+    """
+    Create a Proforma Invoice (PI) from a billing schedule.
+
+    This will:
+    1. Get the billing schedule and its parent ClientPO
+    2. Create a Proforma Invoice with the schedule amounts
+    3. Update the schedule status to PI_RAISED
+    """
+    # Get schedule with parent PO
+    result = await db.execute(
+        select(BillingSchedule)
+        .options(
+            selectinload(BillingSchedule.client_po).selectinload(ClientPO.client),
+            selectinload(BillingSchedule.client_po).selectinload(ClientPO.branch),
+            selectinload(BillingSchedule.client_po).selectinload(ClientPO.items)
+        )
+        .where(BillingSchedule.id == schedule_id)
+    )
+    schedule = result.scalar_one_or_none()
+
+    if not schedule:
+        raise ValueError(f"Schedule {schedule_id} not found")
+
+    if schedule.status != ScheduleStatus.PENDING:
+        raise ValueError(f"Schedule {schedule_id} is not in PENDING status (current: {schedule.status.value})")
+
+    client_po = schedule.client_po
+    if not client_po:
+        raise ValueError(f"Schedule {schedule_id} has no linked ClientPO")
+
+    # Use provided dates or defaults
+    if pi_date is None:
+        pi_date = date.today()
+    if due_date is None:
+        due_date = schedule.due_date
+
+    # Generate PI number
+    pi_number = await generate_pi_number(db, pi_date)
+
+    # Calculate GST split
+    is_igst = client_po.is_igst
+    gst_amount = schedule.gst_amount
+
+    if is_igst:
+        cgst_amount = Decimal('0')
+        sgst_amount = Decimal('0')
+        igst_amount = gst_amount
+    else:
+        cgst_amount = gst_amount / 2
+        sgst_amount = gst_amount / 2
+        igst_amount = Decimal('0')
+
+    # Determine GST rate from the schedule amounts
+    if schedule.amount > 0:
+        gst_rate = (schedule.gst_amount / schedule.amount * 100).quantize(Decimal('0.01'))
+    else:
+        gst_rate = Decimal('18')
+
+    # Create Proforma Invoice
+    pi = ProformaInvoice(
+        pi_number=pi_number,
+        pi_date=pi_date,
+        due_date=due_date,
+        valid_until=due_date,
+        client_id=client_po.client_id,
+        branch_id=client_po.branch_id,
+        bank_account_id=bank_account_id,
+        billing_schedule_id=schedule.id,
+        place_of_supply=client_po.place_of_supply or "",
+        place_of_supply_code=client_po.place_of_supply_code or "",
+        is_igst=is_igst,
+        reverse_charge=False,
+        subtotal=schedule.amount,
+        discount_percent=Decimal('0'),
+        discount_amount=Decimal('0'),
+        taxable_amount=schedule.amount,
+        cgst_amount=cgst_amount,
+        sgst_amount=sgst_amount,
+        igst_amount=igst_amount,
+        cess_amount=Decimal('0'),
+        round_off=Decimal('0'),
+        total_amount=schedule.total_amount,
+        tds_applicable=False,
+        tds_rate=Decimal('0'),
+        tds_amount=Decimal('0'),
+        tcs_applicable=False,
+        tcs_rate=Decimal('0'),
+        tcs_amount=Decimal('0'),
+        amount_after_tds=schedule.total_amount,  # Set to total_amount since TDS is not applicable
+        notes=notes or schedule.notes,
+        status=PIStatus.DRAFT,
+    )
+
+    # Create PI item from schedule
+    description = schedule.description or f"Proforma Invoice for {client_po.subject or client_po.internal_number}"
+
+    pi_item = ProformaInvoiceItem(
+        serial_no=1,
+        description=description,
+        hsn_sac=client_po.items[0].hsn_sac if client_po.items else None,
+        quantity=Decimal('1'),
+        unit="NOS",
+        rate=schedule.amount,
+        amount=schedule.amount,
+        discount_percent=Decimal('0'),
+        discount_amount=Decimal('0'),
+        taxable_amount=schedule.amount,
+        gst_rate=gst_rate,
+        cgst_rate=gst_rate / 2 if not is_igst else Decimal('0'),
+        cgst_amount=cgst_amount,
+        sgst_rate=gst_rate / 2 if not is_igst else Decimal('0'),
+        sgst_amount=sgst_amount,
+        igst_rate=gst_rate if is_igst else Decimal('0'),
+        igst_amount=igst_amount,
+        cess_rate=Decimal('0'),
+        cess_amount=Decimal('0'),
+        total_amount=schedule.total_amount,
+    )
+    pi.items.append(pi_item)
+
+    db.add(pi)
+    await db.flush()  # Get the PI ID
+
+    # Update schedule status to PI_RAISED
+    schedule.status = ScheduleStatus.PI_RAISED
+    schedule.proforma_invoice_id = pi.id
+
+    return pi

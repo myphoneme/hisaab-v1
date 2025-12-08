@@ -1,21 +1,19 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Plus, Trash2, Save, X, Paperclip, Upload, Loader2 } from 'lucide-react';
+import { Plus, Trash2, Save, X } from 'lucide-react';
 import { toast } from 'sonner';
 import { Card, CardContent, CardHeader } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
 import { BranchSelector } from '../../components/ui/BranchSelector';
-import { FileUpload } from '../../components/ui/FileUpload';
-import { AttachmentList } from '../../components/invoices/AttachmentList';
-import { invoiceApi, clientApi, vendorApi, invoiceAttachmentApi, stateApi, bankAccountApi, itemApi, settingsApi } from '../../services/api';
-import type { Client, Vendor, Invoice, InvoiceAttachment, State, BankAccount, Item, CompanySettings } from '../../types';
+import { proformaInvoiceApi, clientApi, stateApi, bankAccountApi, itemApi, settingsApi } from '../../services/api';
+import type { Client, ProformaInvoice, State, BankAccount, Item, CompanySettings } from '../../types';
 
-interface InvoiceItem {
+interface PIItem {
   serial_no: number;
-  item_id?: number;  // Reference to Item master
-  item_name?: string;  // Display name from Item master
+  item_id?: number;
+  item_name?: string;
   description: string;
   hsn_sac: string;
   quantity: number;
@@ -26,13 +24,11 @@ interface InvoiceItem {
   cess_rate: number;
 }
 
-interface InvoiceFormData {
-  invoice_date: string;
-  invoice_type: 'SALES' | 'PURCHASE' | 'CREDIT_NOTE' | 'DEBIT_NOTE';
+interface PIFormData {
+  pi_date: string;
   branch_id?: number;
   bank_account_id?: number;
   client_id?: number;
-  vendor_id?: number;
   place_of_supply: string;
   place_of_supply_code: string;
   is_igst: boolean;
@@ -44,76 +40,20 @@ interface InvoiceFormData {
   tcs_applicable: boolean;
   tcs_rate: number;
   due_date: string;
+  valid_until: string;
   notes: string;
   terms_conditions: string;
-  items: InvoiceItem[];
+  items: PIItem[];
 }
 
-export function InvoiceForm() {
+export function ProformaInvoiceForm() {
   const { id } = useParams();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const isEdit = Boolean(id);
 
-  // Attachment states
-  const [filesToUpload, setFilesToUpload] = useState<File[]>([]);
-  const [isUploading, setIsUploading] = useState(false);
-  const [deletingAttachmentId, setDeletingAttachmentId] = useState<number | null>(null);
-
-  // Fetch attachments for edit mode
-  const { data: attachmentsData, refetch: refetchAttachments } = useQuery({
-    queryKey: ['invoice-attachments', id],
-    queryFn: async () => {
-      const response = await invoiceAttachmentApi.list(Number(id));
-      return response;
-    },
-    enabled: isEdit && !!id,
-  });
-
-  const attachments = (attachmentsData as { attachments: InvoiceAttachment[] })?.attachments || [];
-
-  const handleUploadFiles = async () => {
-    if (filesToUpload.length === 0 || !id) return;
-
-    setIsUploading(true);
-    try {
-      await invoiceAttachmentApi.upload(Number(id), filesToUpload);
-      toast.success(`${filesToUpload.length} file(s) uploaded successfully`);
-      setFilesToUpload([]);
-      refetchAttachments();
-    } catch (error: any) {
-      toast.error(error.message || 'Failed to upload files');
-    } finally {
-      setIsUploading(false);
-    }
-  };
-
-  const handleDownloadAttachment = async (attachment: InvoiceAttachment) => {
-    try {
-      await invoiceAttachmentApi.download(Number(id), attachment.id, attachment.filename);
-    } catch {
-      toast.error('Failed to download file');
-    }
-  };
-
-  const handleDeleteAttachment = async (attachment: InvoiceAttachment) => {
-    if (!confirm(`Delete "${attachment.filename}"?`)) return;
-
-    setDeletingAttachmentId(attachment.id);
-    try {
-      await invoiceAttachmentApi.delete(Number(id), attachment.id);
-      toast.success('Attachment deleted');
-      refetchAttachments();
-    } catch {
-      toast.error('Failed to delete attachment');
-    } finally {
-      setDeletingAttachmentId(null);
-    }
-  };
-
-  const [formData, setFormData] = useState<InvoiceFormData>({
-    invoice_date: new Date().toISOString().split('T')[0],
-    invoice_type: 'SALES',
+  const [formData, setFormData] = useState<PIFormData>({
+    pi_date: new Date().toISOString().split('T')[0],
     branch_id: undefined,
     bank_account_id: undefined,
     place_of_supply: '',
@@ -127,6 +67,7 @@ export function InvoiceForm() {
     tcs_applicable: false,
     tcs_rate: 0,
     due_date: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+    valid_until: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
     notes: '',
     terms_conditions: '',
     items: [
@@ -144,11 +85,20 @@ export function InvoiceForm() {
     ],
   });
 
-  // Fetch existing invoice for edit mode
-  const { data: existingInvoice, isLoading: isLoadingInvoice } = useQuery<Invoice>({
-    queryKey: ['invoice', id],
-    queryFn: () => invoiceApi.getById(Number(id)),
+  // Fetch existing PI for edit mode
+  const { data: existingPI, isLoading: isLoadingPI } = useQuery<ProformaInvoice>({
+    queryKey: ['proforma-invoice', id],
+    queryFn: () => proformaInvoiceApi.getById(Number(id)),
     enabled: isEdit,
+  });
+
+  // Fetch items from Item Master (moved here so it's available for useEffect below)
+  const { data: items = [] } = useQuery<Item[]>({
+    queryKey: ['items-active'],
+    queryFn: async () => {
+      const response = await itemApi.getActive();
+      return response || [];
+    },
   });
 
   // Fetch company settings for default terms
@@ -157,70 +107,99 @@ export function InvoiceForm() {
     queryFn: () => settingsApi.get(),
   });
 
-  // Set default terms from settings for new invoice
+  // Set default terms from settings for new PI or if terms is empty (generated from schedule)
   useEffect(() => {
-    if (!isEdit && settings?.invoice_terms && !formData.terms_conditions) {
+    if (!isEdit && settings?.pi_terms && !formData.terms_conditions) {
       setFormData(prev => ({
         ...prev,
-        terms_conditions: settings.invoice_terms || '',
+        terms_conditions: settings.pi_terms || '',
       }));
     }
   }, [isEdit, settings]);
 
-  // Populate form with existing invoice data
+  // Populate form with existing PI data
   useEffect(() => {
-    if (existingInvoice) {
-      const mappedItems = existingInvoice.items.map((item, index) => ({
-        serial_no: item.serial_no || index + 1,
-        description: item.description,
-        hsn_sac: item.hsn_sac || '',
-        quantity: Number(item.quantity),
-        unit: item.unit || 'NOS',
-        rate: Number(item.rate),
-        discount_percent: Number(item.discount_percent) || 0,
-        gst_rate: Number(item.gst_rate) || 18,
-        cess_rate: Number(item.cess_rate) || 0,
-      }));
+    if (existingPI && items.length > 0) {
+      const mappedItems = existingPI.items?.map((item, index) => {
+        // Try to find item_id by matching item_name, description, or HSN/SAC if item_id is not set
+        let itemId = item.item_id;
+        let itemName = item.item_name;
+
+        if (!itemId && items.length > 0) {
+          // First try to match by item_name
+          if (item.item_name) {
+            const matchedItem = items.find(i => i.name === item.item_name);
+            if (matchedItem) {
+              itemId = matchedItem.id;
+              itemName = matchedItem.name;
+            }
+          }
+          // If still not found, try to match by HSN/SAC code
+          if (!itemId && item.hsn_sac) {
+            const matchedItem = items.find(i => i.hsn_sac === item.hsn_sac);
+            if (matchedItem) {
+              itemId = matchedItem.id;
+              itemName = matchedItem.name;
+            }
+          }
+          // If still not found, try to match by description
+          if (!itemId && item.description) {
+            const matchedItem = items.find(i =>
+              i.name === item.description ||
+              i.description === item.description
+            );
+            if (matchedItem) {
+              itemId = matchedItem.id;
+              itemName = matchedItem.name;
+            }
+          }
+        }
+
+        return {
+          serial_no: item.serial_no || index + 1,
+          item_id: itemId,
+          item_name: itemName,
+          description: item.description,
+          hsn_sac: item.hsn_sac || '',
+          quantity: Number(item.quantity),
+          unit: item.unit || 'NOS',
+          rate: Number(item.rate),
+          discount_percent: Number(item.discount_percent) || 0,
+          gst_rate: Number(item.gst_rate) || 18,
+          cess_rate: Number(item.cess_rate) || 0,
+        };
+      }) || [];
 
       setFormData({
-        invoice_date: existingInvoice.invoice_date.split('T')[0],
-        invoice_type: existingInvoice.invoice_type,
-        branch_id: existingInvoice.branch_id ?? undefined,
-        bank_account_id: existingInvoice.bank_account_id ?? undefined,
-        client_id: existingInvoice.client_id ?? undefined,
-        vendor_id: existingInvoice.vendor_id ?? undefined,
-        place_of_supply: existingInvoice.place_of_supply || '',
-        place_of_supply_code: existingInvoice.place_of_supply_code || '',
-        is_igst: existingInvoice.is_igst,
-        reverse_charge: existingInvoice.reverse_charge || false,
-        discount_percent: existingInvoice.discount_percent || 0,
-        tds_applicable: existingInvoice.tds_applicable || false,
-        tds_section: existingInvoice.tds_section || '',
-        tds_rate: existingInvoice.tds_rate || 0,
-        tcs_applicable: existingInvoice.tcs_applicable || false,
-        tcs_rate: existingInvoice.tcs_rate || 0,
-        due_date: existingInvoice.due_date.split('T')[0],
-        notes: existingInvoice.notes || '',
-        // Use settings.invoice_terms if terms_conditions is empty
-        terms_conditions: existingInvoice.terms_conditions || settings?.invoice_terms || '',
+        pi_date: existingPI.pi_date.split('T')[0],
+        branch_id: existingPI.branch_id ?? undefined,
+        bank_account_id: existingPI.bank_account_id ?? undefined,
+        client_id: existingPI.client_id ?? undefined,
+        place_of_supply: existingPI.place_of_supply || '',
+        place_of_supply_code: existingPI.place_of_supply_code || '',
+        is_igst: existingPI.is_igst,
+        reverse_charge: existingPI.reverse_charge || false,
+        discount_percent: existingPI.discount_percent || 0,
+        tds_applicable: existingPI.tds_applicable || false,
+        tds_section: existingPI.tds_section || '',
+        tds_rate: existingPI.tds_rate || 0,
+        tcs_applicable: existingPI.tcs_applicable || false,
+        tcs_rate: existingPI.tcs_rate || 0,
+        due_date: existingPI.due_date.split('T')[0],
+        valid_until: existingPI.valid_until?.split('T')[0] || '',
+        notes: existingPI.notes || '',
+        // Use settings.pi_terms if terms_conditions is empty (e.g., generated from schedule)
+        terms_conditions: existingPI.terms_conditions || settings?.pi_terms || '',
         items: mappedItems,
       });
     }
-  }, [existingInvoice, settings]);
+  }, [existingPI, items, settings]);
 
-  // Fetch clients and vendors
+  // Fetch clients
   const { data: clients = [] } = useQuery<Client[]>({
     queryKey: ['clients'],
     queryFn: async () => {
       const response = await clientApi.getAll();
-      return response.items || [];
-    },
-  });
-
-  const { data: vendors = [] } = useQuery<Vendor[]>({
-    queryKey: ['vendors'],
-    queryFn: async () => {
-      const response = await vendorApi.getAll();
       return response.items || [];
     },
   });
@@ -240,41 +219,39 @@ export function InvoiceForm() {
     },
   });
 
-  // Fetch items from Item Master
-  const { data: items = [] } = useQuery<Item[]>({
-    queryKey: ['items-active'],
-    queryFn: async () => {
-      const response = await itemApi.getActive();
-      return response || [];
-    },
-  });
-
   const createMutation = useMutation({
-    mutationFn: (data: InvoiceFormData) => invoiceApi.create(data),
+    mutationFn: (data: PIFormData) => proformaInvoiceApi.create(data),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['invoices'] });
-      alert('Invoice created successfully!');
-      navigate('/invoices');
+      queryClient.invalidateQueries({ queryKey: ['proforma-invoices'] });
+      toast.success('Proforma Invoice created successfully!');
+      navigate('/proforma-invoices');
     },
-    onError: (error: any) => {
-      alert(`Failed to create invoice: ${error.response?.data?.detail || error.message}`);
+    onError: (error: Error & { response?: { data?: { detail?: string } } }) => {
+      toast.error(error.response?.data?.detail || 'Failed to create proforma invoice');
     },
   });
 
   const updateMutation = useMutation({
-    mutationFn: (data: InvoiceFormData) => invoiceApi.update(Number(id), data),
+    mutationFn: (data: PIFormData) => proformaInvoiceApi.update(Number(id), data),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['invoices'] });
-      alert('Invoice updated successfully!');
-      navigate('/invoices');
+      queryClient.invalidateQueries({ queryKey: ['proforma-invoices'] });
+      toast.success('Proforma Invoice updated successfully!');
+      navigate('/proforma-invoices');
     },
-    onError: (error: any) => {
-      alert(`Failed to update invoice: ${error.response?.data?.detail || error.message}`);
+    onError: (error: Error & { response?: { data?: { detail?: string } } }) => {
+      toast.error(error.response?.data?.detail || 'Failed to update proforma invoice');
     },
   });
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    // Debug: Log the data being sent
+    console.log('PI Form Submit - Data:', {
+      bank_account_id: formData.bank_account_id,
+      tds_section: formData.tds_section,
+      notes: formData.notes,
+      tds_applicable: formData.tds_applicable,
+    });
     if (isEdit) {
       updateMutation.mutate(formData);
     } else {
@@ -282,11 +259,11 @@ export function InvoiceForm() {
     }
   };
 
-  const handleChange = (field: keyof InvoiceFormData, value: any) => {
+  const handleChange = (field: keyof PIFormData, value: unknown) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
   };
 
-  const handleItemChange = (index: number, field: keyof InvoiceItem, value: any) => {
+  const handleItemChange = (index: number, field: keyof PIItem, value: unknown) => {
     const updatedItems = [...formData.items];
     updatedItems[index] = { ...updatedItems[index], [field]: value };
     setFormData((prev) => ({ ...prev, items: updatedItems }));
@@ -311,7 +288,6 @@ export function InvoiceForm() {
         };
       }
     } else {
-      // Clear item selection
       updatedItems[index] = {
         ...updatedItems[index],
         item_id: undefined,
@@ -351,7 +327,7 @@ export function InvoiceForm() {
     }
   };
 
-  const calculateItemAmount = (item: InvoiceItem) => {
+  const calculateItemAmount = (item: PIItem) => {
     const amount = item.quantity * item.rate;
     const discountAmount = (amount * item.discount_percent) / 100;
     const taxableAmount = amount - discountAmount;
@@ -388,11 +364,11 @@ export function InvoiceForm() {
 
   const totals = calculateTotals();
 
-  // Show loading state when fetching existing invoice
-  if (isEdit && isLoadingInvoice) {
+  // Show loading state when fetching existing PI
+  if (isEdit && isLoadingPI) {
     return (
       <div className="flex items-center justify-center h-64">
-        <div className="text-gray-500">Loading invoice data...</div>
+        <div className="text-gray-500">Loading proforma invoice data...</div>
       </div>
     );
   }
@@ -402,13 +378,13 @@ export function InvoiceForm() {
       <div className="flex justify-between items-center">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">
-            {isEdit ? 'Edit Invoice' : 'Create Invoice'}
+            {isEdit ? 'Edit Proforma Invoice' : 'Create Proforma Invoice'}
           </h1>
           <p className="text-gray-500 mt-1">
-            {isEdit ? 'Update invoice details' : 'Create a new sales or purchase invoice'}
+            {isEdit ? 'Update proforma invoice details' : 'Create a new proforma invoice'}
           </p>
         </div>
-        <Button variant="outline" onClick={() => navigate('/invoices')}>
+        <Button variant="outline" onClick={() => navigate('/proforma-invoices')}>
           <X className="h-4 w-4 mr-2" />
           Cancel
         </Button>
@@ -418,29 +394,10 @@ export function InvoiceForm() {
         {/* Basic Details */}
         <Card>
           <CardHeader>
-            <h3 className="text-lg font-semibold">Invoice Details</h3>
+            <h3 className="text-lg font-semibold">PI Details</h3>
           </CardHeader>
           <CardContent className="p-6">
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Invoice Type *
-                </label>
-                <select
-                  className="w-full border border-gray-300 rounded-md px-3 py-2"
-                  value={formData.invoice_type}
-                  onChange={(e) =>
-                    handleChange('invoice_type', e.target.value as any)
-                  }
-                  required
-                >
-                  <option value="SALES">Sales Invoice</option>
-                  <option value="PURCHASE">Purchase Invoice</option>
-                  <option value="CREDIT_NOTE">Credit Note</option>
-                  <option value="DEBIT_NOTE">Debit Note</option>
-                </select>
-              </div>
-
               <div>
                 <BranchSelector
                   value={formData.branch_id}
@@ -451,12 +408,12 @@ export function InvoiceForm() {
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Invoice Date *
+                  PI Date *
                 </label>
                 <Input
                   type="date"
-                  value={formData.invoice_date}
-                  onChange={(e) => handleChange('invoice_date', e.target.value)}
+                  value={formData.pi_date}
+                  onChange={(e) => handleChange('pi_date', e.target.value)}
                   required
                 />
               </div>
@@ -473,51 +430,35 @@ export function InvoiceForm() {
                 />
               </div>
 
-              {['SALES', 'CREDIT_NOTE'].includes(formData.invoice_type) && (
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Client *
-                  </label>
-                  <select
-                    className="w-full border border-gray-300 rounded-md px-3 py-2"
-                    value={formData.client_id || ''}
-                    onChange={(e) =>
-                      handleChange('client_id', Number(e.target.value))
-                    }
-                    required
-                  >
-                    <option value="">Select Client</option>
-                    {clients.map((client) => (
-                      <option key={client.id} value={client.id}>
-                        {client.name}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              )}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Valid Until
+                </label>
+                <Input
+                  type="date"
+                  value={formData.valid_until}
+                  onChange={(e) => handleChange('valid_until', e.target.value)}
+                />
+              </div>
 
-              {['PURCHASE', 'DEBIT_NOTE'].includes(formData.invoice_type) && (
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Vendor *
-                  </label>
-                  <select
-                    className="w-full border border-gray-300 rounded-md px-3 py-2"
-                    value={formData.vendor_id || ''}
-                    onChange={(e) =>
-                      handleChange('vendor_id', Number(e.target.value))
-                    }
-                    required
-                  >
-                    <option value="">Select Vendor</option>
-                    {vendors.map((vendor) => (
-                      <option key={vendor.id} value={vendor.id}>
-                        {vendor.name}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              )}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Client *
+                </label>
+                <select
+                  className="w-full border border-gray-300 rounded-md px-3 py-2"
+                  value={formData.client_id || ''}
+                  onChange={(e) => handleChange('client_id', Number(e.target.value))}
+                  required
+                >
+                  <option value="">Select Client</option>
+                  {clients.map((client) => (
+                    <option key={client.id} value={client.id}>
+                      {client.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -585,10 +526,7 @@ export function InvoiceForm() {
                   onChange={(e) => handleChange('reverse_charge', e.target.checked)}
                   className="mr-2"
                 />
-                <label
-                  htmlFor="reverse_charge"
-                  className="text-sm font-medium text-gray-700"
-                >
+                <label htmlFor="reverse_charge" className="text-sm font-medium text-gray-700">
                   Reverse Charge
                 </label>
               </div>
@@ -615,15 +553,15 @@ export function InvoiceForm() {
                   className="grid grid-cols-12 gap-2 items-start border-b pb-4"
                 >
                   <div className="col-span-2">
-                    <label className="text-xs text-gray-500">Item Name</label>
+                    <label className="text-xs text-gray-500">Item Name (Optional)</label>
                     <select
                       className="w-full border border-gray-300 rounded-md px-2 py-2 text-sm"
-                      value={item.item_id || ''}
+                      value={item.item_id ? String(item.item_id) : ''}
                       onChange={(e) => handleItemSelect(index, e.target.value ? Number(e.target.value) : undefined)}
                     >
-                      <option value="">-- Select Item --</option>
+                      <option value="">-- Select from Master --</option>
                       {items.map((masterItem) => (
-                        <option key={masterItem.id} value={masterItem.id}>
+                        <option key={masterItem.id} value={String(masterItem.id)}>
                           {masterItem.name}
                         </option>
                       ))}
@@ -633,9 +571,7 @@ export function InvoiceForm() {
                     <label className="text-xs text-gray-500">Description *</label>
                     <Input
                       value={item.description}
-                      onChange={(e) =>
-                        handleItemChange(index, 'description', e.target.value)
-                      }
+                      onChange={(e) => handleItemChange(index, 'description', e.target.value)}
                       required
                     />
                   </div>
@@ -643,9 +579,7 @@ export function InvoiceForm() {
                     <label className="text-xs text-gray-500">HSN/SAC</label>
                     <Input
                       value={item.hsn_sac}
-                      onChange={(e) =>
-                        handleItemChange(index, 'hsn_sac', e.target.value)
-                      }
+                      onChange={(e) => handleItemChange(index, 'hsn_sac', e.target.value)}
                     />
                   </div>
                   <div className="col-span-1">
@@ -653,9 +587,7 @@ export function InvoiceForm() {
                     <Input
                       type="number"
                       value={item.quantity}
-                      onChange={(e) =>
-                        handleItemChange(index, 'quantity', Number(e.target.value))
-                      }
+                      onChange={(e) => handleItemChange(index, 'quantity', Number(e.target.value))}
                       min="0"
                       step="0.01"
                       required
@@ -673,9 +605,7 @@ export function InvoiceForm() {
                     <Input
                       type="number"
                       value={item.rate}
-                      onChange={(e) =>
-                        handleItemChange(index, 'rate', Number(e.target.value))
-                      }
+                      onChange={(e) => handleItemChange(index, 'rate', Number(e.target.value))}
                       min="0"
                       step="0.01"
                       required
@@ -686,13 +616,7 @@ export function InvoiceForm() {
                     <Input
                       type="number"
                       value={item.discount_percent}
-                      onChange={(e) =>
-                        handleItemChange(
-                          index,
-                          'discount_percent',
-                          Number(e.target.value)
-                        )
-                      }
+                      onChange={(e) => handleItemChange(index, 'discount_percent', Number(e.target.value))}
                       min="0"
                       max="100"
                       step="0.01"
@@ -703,9 +627,7 @@ export function InvoiceForm() {
                     <Input
                       type="number"
                       value={item.gst_rate}
-                      onChange={(e) =>
-                        handleItemChange(index, 'gst_rate', Number(e.target.value))
-                      }
+                      onChange={(e) => handleItemChange(index, 'gst_rate', Number(e.target.value))}
                       min="0"
                       max="100"
                     />
@@ -800,15 +722,10 @@ export function InvoiceForm() {
                     type="checkbox"
                     id="tds_applicable"
                     checked={formData.tds_applicable}
-                    onChange={(e) =>
-                      handleChange('tds_applicable', e.target.checked)
-                    }
+                    onChange={(e) => handleChange('tds_applicable', e.target.checked)}
                     className="mr-2"
                   />
-                  <label
-                    htmlFor="tds_applicable"
-                    className="text-sm font-medium text-gray-700"
-                  >
+                  <label htmlFor="tds_applicable" className="text-sm font-medium text-gray-700">
                     TDS Applicable
                   </label>
                 </div>
@@ -838,9 +755,7 @@ export function InvoiceForm() {
                       <Input
                         type="number"
                         value={formData.tds_rate}
-                        onChange={(e) =>
-                          handleChange('tds_rate', Number(e.target.value))
-                        }
+                        onChange={(e) => handleChange('tds_rate', Number(e.target.value))}
                         min="0"
                         max="100"
                         step="0.01"
@@ -856,15 +771,10 @@ export function InvoiceForm() {
                     type="checkbox"
                     id="tcs_applicable"
                     checked={formData.tcs_applicable}
-                    onChange={(e) =>
-                      handleChange('tcs_applicable', e.target.checked)
-                    }
+                    onChange={(e) => handleChange('tcs_applicable', e.target.checked)}
                     className="mr-2"
                   />
-                  <label
-                    htmlFor="tcs_applicable"
-                    className="text-sm font-medium text-gray-700"
-                  >
+                  <label htmlFor="tcs_applicable" className="text-sm font-medium text-gray-700">
                     TCS Applicable
                   </label>
                 </div>
@@ -876,9 +786,7 @@ export function InvoiceForm() {
                     <Input
                       type="number"
                       value={formData.tcs_rate}
-                      onChange={(e) =>
-                        handleChange('tcs_rate', Number(e.target.value))
-                      }
+                      onChange={(e) => handleChange('tcs_rate', Number(e.target.value))}
                       min="0"
                       max="100"
                       step="0.01"
@@ -925,85 +833,12 @@ export function InvoiceForm() {
           </CardContent>
         </Card>
 
-        {/* Attachments - Only show in edit mode */}
-        {isEdit && (
-          <Card>
-            <CardHeader>
-              <h3 className="text-lg font-semibold flex items-center gap-2">
-                <Paperclip className="h-5 w-5" />
-                Attachments
-              </h3>
-            </CardHeader>
-            <CardContent className="p-6">
-              <div className="space-y-4">
-                {/* Existing attachments */}
-                {attachments.length > 0 && (
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Uploaded Files ({attachments.length})
-                    </label>
-                    <AttachmentList
-                      attachments={attachments}
-                      onDownload={handleDownloadAttachment}
-                      onDelete={handleDeleteAttachment}
-                      isDeleting={deletingAttachmentId}
-                      canDelete={true}
-                    />
-                  </div>
-                )}
-
-                {/* Upload new files */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Upload New Files
-                  </label>
-                  <FileUpload
-                    onFilesSelected={setFilesToUpload}
-                    maxSize={10}
-                    maxFiles={10 - attachments.length}
-                    disabled={attachments.length >= 10}
-                  />
-                </div>
-
-                {/* Upload button */}
-                {filesToUpload.length > 0 && (
-                  <div className="flex justify-end">
-                    <Button
-                      type="button"
-                      onClick={handleUploadFiles}
-                      disabled={isUploading}
-                    >
-                      {isUploading ? (
-                        <>
-                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                          Uploading...
-                        </>
-                      ) : (
-                        <>
-                          <Upload className="h-4 w-4 mr-2" />
-                          Upload {filesToUpload.length} File(s)
-                        </>
-                      )}
-                    </Button>
-                  </div>
-                )}
-
-                {attachments.length >= 10 && (
-                  <p className="text-sm text-amber-600">
-                    Maximum 10 files per invoice. Delete existing files to upload new ones.
-                  </p>
-                )}
-              </div>
-            </CardContent>
-          </Card>
-        )}
-
         {/* Action Buttons */}
         <div className="flex justify-end gap-4">
           <Button
             type="button"
             variant="outline"
-            onClick={() => navigate('/invoices')}
+            onClick={() => navigate('/proforma-invoices')}
           >
             Cancel
           </Button>
@@ -1012,7 +847,7 @@ export function InvoiceForm() {
             disabled={createMutation.isPending || updateMutation.isPending}
           >
             <Save className="h-4 w-4 mr-2" />
-            {isEdit ? 'Update' : 'Create'} Invoice
+            {isEdit ? 'Update' : 'Create'} Proforma Invoice
           </Button>
         </div>
       </form>

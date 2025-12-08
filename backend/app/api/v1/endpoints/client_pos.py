@@ -33,9 +33,11 @@ from app.schemas.invoice import InvoiceResponse
 from app.schemas.common import PaginatedResponse, Message
 from app.core.security import get_current_user
 from app.services.number_generator import generate_client_po_number
-from app.services.fulfillment import create_invoice_from_schedule as create_invoice_service
+from app.services.fulfillment import create_invoice_from_schedule as create_invoice_service, create_pi_from_schedule as create_pi_service
 from app.models.invoice import Invoice
+from app.models.proforma_invoice import ProformaInvoice
 from app.models.bank_account import BankAccount
+from app.schemas.proforma_invoice import PIResponse
 
 router = APIRouter()
 
@@ -673,6 +675,71 @@ async def create_invoice_from_schedule(
         )
         invoice = result.scalar_one()
         return invoice
+
+    except ValueError as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+    except Exception as e:
+        await db.rollback()
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
+
+
+@router.post("/{po_id}/schedules/{schedule_id}/create-pi", response_model=PIResponse)
+async def create_pi_from_schedule(
+    po_id: int,
+    schedule_id: int,
+    request: CreateInvoiceFromScheduleRequest,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """
+    Create a Proforma Invoice (PI) from a billing schedule.
+
+    This will:
+    1. Create a PI with schedule amounts
+    2. Update the schedule status to PI_RAISED
+    """
+    # Verify schedule belongs to the PO
+    result = await db.execute(
+        select(BillingSchedule).where(
+            (BillingSchedule.id == schedule_id) &
+            (BillingSchedule.client_po_id == po_id)
+        )
+    )
+    schedule = result.scalar_one_or_none()
+
+    if not schedule:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Schedule not found")
+
+    if schedule.status != ScheduleStatus.PENDING:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Cannot create PI from schedule in {schedule.status.value} status"
+        )
+
+    try:
+        pi = await create_pi_service(
+            db=db,
+            schedule_id=schedule_id,
+            pi_date=request.invoice_date,
+            due_date=request.due_date,
+            bank_account_id=request.bank_account_id,
+            notes=request.notes,
+        )
+        await db.commit()
+
+        # Reload PI with relationships
+        result = await db.execute(
+            select(ProformaInvoice)
+            .options(
+                selectinload(ProformaInvoice.items),
+                selectinload(ProformaInvoice.client),
+                selectinload(ProformaInvoice.branch),
+                selectinload(ProformaInvoice.bank_account)
+            )
+            .where(ProformaInvoice.id == pi.id)
+        )
+        pi = result.scalar_one()
+        return pi
 
     except ValueError as e:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))

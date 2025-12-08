@@ -16,6 +16,7 @@ from app.models.state import State
 from app.models.item import Item
 from app.models.client_po import ClientPO, ClientPOItem, ClientPOStatus, BillingFrequency
 from app.models.billing_schedule import BillingSchedule, ScheduleStatus
+from app.models.proforma_invoice import ProformaInvoice, ProformaInvoiceItem, PIStatus
 
 __all__ = [
     "User",
@@ -43,4 +44,7 @@ __all__ = [
     "BillingFrequency",
     "BillingSchedule",
     "ScheduleStatus",
+    "ProformaInvoice",
+    "ProformaInvoiceItem",
+    "PIStatus",
 ]

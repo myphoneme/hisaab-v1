@@ -616,6 +616,118 @@ export interface CreateInvoiceFromScheduleRequest {
   notes?: string;
 }
 
+// Proforma Invoice Types
+export type PIStatus = 'DRAFT' | 'SENT' | 'GENERATED' | 'CANCELLED';
+
+export interface ProformaInvoiceItem {
+  id: number;
+  proforma_invoice_id: number;
+  serial_no: number;
+  item_id: number | null;
+  item_name: string | null;
+  description: string;
+  hsn_sac: string | null;
+  quantity: number;
+  unit: string;
+  rate: number;
+  amount: number;
+  discount_percent: number;
+  discount_amount: number;
+  taxable_amount: number;
+  gst_rate: number;
+  cgst_rate: number;
+  cgst_amount: number;
+  sgst_rate: number;
+  sgst_amount: number;
+  igst_rate: number;
+  igst_amount: number;
+  cess_rate: number;
+  cess_amount: number;
+  total_amount: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ProformaInvoice extends BaseEntity {
+  pi_number: string;
+  pi_date: string;
+  client_id: number;
+  branch_id: number | null;
+  bank_account_id: number | null;
+  client_po_id: number | null;
+  billing_schedule_id: number | null;
+  place_of_supply: string;
+  place_of_supply_code: string;
+  is_igst: boolean;
+  reverse_charge: boolean;
+  subtotal: number;
+  discount_percent: number;
+  discount_amount: number;
+  taxable_amount: number;
+  cgst_amount: number;
+  sgst_amount: number;
+  igst_amount: number;
+  cess_amount: number;
+  round_off: number;
+  total_amount: number;
+  tds_applicable: boolean;
+  tds_section: string | null;
+  tds_rate: number;
+  tds_amount: number;
+  tcs_applicable: boolean;
+  tcs_rate: number;
+  tcs_amount: number;
+  amount_after_tds: number;
+  due_date: string;
+  valid_until: string | null;
+  status: PIStatus;
+  invoice_id: number | null;
+  notes: string | null;
+  terms_conditions: string | null;
+  items?: ProformaInvoiceItem[];
+  client?: Client;
+  branch?: Branch;
+  bank_account?: BankAccount;
+}
+
+export interface ProformaInvoiceItemCreate {
+  serial_no: number;
+  item_id?: number;
+  item_name?: string;
+  description: string;
+  hsn_sac?: string;
+  quantity: number;
+  unit?: string;
+  rate: number;
+  discount_percent?: number;
+  gst_rate?: number;
+  cess_rate?: number;
+}
+
+export interface ProformaInvoiceCreate {
+  pi_date: string;
+  client_id: number;
+  branch_id?: number;
+  bank_account_id?: number;
+  client_po_id?: number;
+  billing_schedule_id?: number;
+  place_of_supply: string;
+  place_of_supply_code: string;
+  is_igst?: boolean;
+  reverse_charge?: boolean;
+  discount_percent?: number;
+  tds_applicable?: boolean;
+  tds_section?: string;
+  tds_rate?: number;
+  tcs_applicable?: boolean;
+  tcs_rate?: number;
+  due_date: string;
+  valid_until?: string;
+  notes?: string;
+  terms_conditions?: string;
+  items: ProformaInvoiceItemCreate[];
+}
+
 // Expense Category Types
 export interface ExpenseCategory extends BaseEntity {
   name: string;
@@ -778,6 +890,8 @@ export interface CompanySettings extends BaseEntity {
   invoice_prefix: string;
   invoice_terms: string | null;
   invoice_notes: string | null;
+  pi_terms: string | null;
+  purchase_order_terms: string | null;
   enable_multi_currency: boolean;
   enable_inventory: boolean;
   is_active: boolean;
@@ -829,6 +943,8 @@ export interface CompanySettingsUpdate {
   invoice_prefix?: string;
   invoice_terms?: string;
   invoice_notes?: string;
+  pi_terms?: string;
+  purchase_order_terms?: string;
   enable_multi_currency?: boolean;
   enable_inventory?: boolean;
   // Ledger Posting Settings

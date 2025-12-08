@@ -12,7 +12,7 @@ import {
   Clock,
   RefreshCw,
   Plus,
-  Receipt,
+  FileCheck,
   ExternalLink,
 } from 'lucide-react';
 import { toast } from 'sonner';
@@ -103,16 +103,16 @@ export function ClientPOView() {
     },
   });
 
-  const createInvoiceMutation = useMutation({
-    mutationFn: (scheduleId: number) => clientPOApi.createInvoiceFromSchedule(Number(id), scheduleId),
-    onSuccess: (invoice) => {
+  const createPIMutation = useMutation({
+    mutationFn: (scheduleId: number) => clientPOApi.createPIFromSchedule(Number(id), scheduleId),
+    onSuccess: (pi) => {
       queryClient.invalidateQueries({ queryKey: ['client-po-schedules', id] });
       queryClient.invalidateQueries({ queryKey: ['client-po', id] });
-      queryClient.invalidateQueries({ queryKey: ['invoices'] });
-      toast.success(`Invoice ${invoice.invoice_number} created successfully!`);
+      queryClient.invalidateQueries({ queryKey: ['proforma-invoices'] });
+      toast.success(`Proforma Invoice ${pi.pi_number} created successfully!`);
     },
     onError: (error: any) => {
-      toast.error(error.response?.data?.detail || 'Failed to create invoice');
+      toast.error(error.response?.data?.detail || 'Failed to create proforma invoice');
     },
   });
 
@@ -411,12 +411,12 @@ export function ClientPOView() {
                             {schedule.status === 'PENDING' && (
                               <>
                                 <button
-                                  onClick={() => createInvoiceMutation.mutate(schedule.id)}
-                                  disabled={createInvoiceMutation.isPending}
+                                  onClick={() => createPIMutation.mutate(schedule.id)}
+                                  disabled={createPIMutation.isPending}
                                   className="text-green-600 hover:text-green-900 disabled:opacity-50"
-                                  title="Create Invoice"
+                                  title="Create Proforma Invoice"
                                 >
-                                  <Receipt className="h-4 w-4" />
+                                  <FileCheck className="h-4 w-4" />
                                 </button>
                                 <button
                                   onClick={() => deleteScheduleMutation.mutate(schedule.id)}
@@ -426,6 +426,15 @@ export function ClientPOView() {
                                   <Trash2 className="h-4 w-4" />
                                 </button>
                               </>
+                            )}
+                            {schedule.status === 'PI_RAISED' && schedule.proforma_invoice_id && (
+                              <Link
+                                to={`/proforma-invoices/${schedule.proforma_invoice_id}`}
+                                className="text-blue-600 hover:text-blue-900"
+                                title="View Proforma Invoice"
+                              >
+                                <ExternalLink className="h-4 w-4" />
+                              </Link>
                             )}
                             {schedule.status === 'INVOICED' && schedule.invoice_id && (
                               <Link

@@ -48,6 +48,12 @@ class CompanySettingsBase(BaseModel):
     invoice_terms: Optional[str] = None
     invoice_notes: Optional[str] = None
 
+    # Proforma Invoice Settings
+    pi_terms: Optional[str] = None
+
+    # Purchase Order Settings
+    purchase_order_terms: Optional[str] = None
+
     # System Settings
     enable_multi_currency: bool = False
     enable_inventory: bool = False
@@ -107,6 +113,8 @@ class CompanySettingsUpdate(BaseModel):
     invoice_prefix: Optional[str] = Field(None, max_length=10)
     invoice_terms: Optional[str] = None
     invoice_notes: Optional[str] = None
+    pi_terms: Optional[str] = None
+    purchase_order_terms: Optional[str] = None
     enable_multi_currency: Optional[bool] = None
     enable_inventory: Optional[bool] = None
     # Ledger Posting Settings

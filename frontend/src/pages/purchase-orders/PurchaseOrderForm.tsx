@@ -1,12 +1,13 @@
+import { useEffect } from 'react';
 import { useForm, useFieldArray } from 'react-hook-form';
 import { X, Plus, Trash2 } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
-import type { PurchaseOrder, PurchaseOrderCreate } from '../../types';
+import type { PurchaseOrder, PurchaseOrderCreate, CompanySettings } from '../../types';
 import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
 import { Select } from '../../components/ui/Select';
 import { BranchSelector } from '../../components/ui/BranchSelector';
-import { clientApi } from '../../services/api';
+import { clientApi, settingsApi } from '../../services/api';
 
 interface PurchaseOrderFormProps {
   purchaseOrder?: PurchaseOrder | null;
@@ -72,6 +73,24 @@ export function PurchaseOrderForm({ purchaseOrder, onSubmit, onClose, isLoading 
   });
 
   const clients = clientsResponse || [];
+
+  // Fetch company settings for default terms
+  const { data: settings } = useQuery<CompanySettings>({
+    queryKey: ['settings'],
+    queryFn: () => settingsApi.get(),
+  });
+
+  // Set default terms from settings for new PO or if edit with empty terms
+  const isEdit = !!purchaseOrder;
+  useEffect(() => {
+    if (settings?.purchase_order_terms) {
+      const currentTerms = watch('terms_conditions');
+      // For new PO, or for edit when terms_conditions is empty
+      if (!currentTerms) {
+        setValue('terms_conditions', settings.purchase_order_terms);
+      }
+    }
+  }, [settings, setValue, watch]);
 
   const watchItems = watch('items');
 
