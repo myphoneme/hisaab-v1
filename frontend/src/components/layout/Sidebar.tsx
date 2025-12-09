@@ -20,6 +20,7 @@ import {
   TrendingUp,
   FileCheck,
   CalendarDays,
+  FileSpreadsheet,
 } from 'lucide-react';
 import { cn } from '../../lib/utils';
 
@@ -41,6 +42,7 @@ const navigation = [
   { name: 'Projects', href: '/projects', icon: FolderKanban },
   { name: 'Ledger', href: '/ledger', icon: BookOpen },
   { name: 'GST Reports', href: '/reports/gst', icon: Receipt },
+  { name: 'TDS Sheet', href: '/tds', icon: FileSpreadsheet },
   { name: 'Expected Income', href: '/reports/expected-income', icon: TrendingUp },
   { name: 'Reports', href: '/reports', icon: BarChart3 },
   { name: 'Settings', href: '/settings', icon: Settings },

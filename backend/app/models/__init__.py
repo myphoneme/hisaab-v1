@@ -17,6 +17,8 @@ from app.models.item import Item
 from app.models.client_po import ClientPO, ClientPOItem, ClientPOStatus, BillingFrequency
 from app.models.billing_schedule import BillingSchedule, ScheduleStatus
 from app.models.proforma_invoice import ProformaInvoice, ProformaInvoiceItem, PIStatus
+from app.models.tds_challan import TDSChallan, TDSChallanEntry, TDSType
+from app.models.tds_return import TDSReturn, ReturnStatus
 
 __all__ = [
     "User",
@@ -47,4 +49,9 @@ __all__ = [
     "ProformaInvoice",
     "ProformaInvoiceItem",
     "PIStatus",
+    "TDSChallan",
+    "TDSChallanEntry",
+    "TDSType",
+    "TDSReturn",
+    "ReturnStatus",
 ]

@@ -43,6 +43,7 @@ import { ClientPOView } from './pages/client-pos/ClientPOView';
 import { ProformaInvoices } from './pages/proforma-invoices/ProformaInvoices';
 import { ProformaInvoiceForm } from './pages/proforma-invoices/ProformaInvoiceForm';
 import { ProformaInvoiceView } from './pages/proforma-invoices/ProformaInvoiceView';
+import TDSSheet from './pages/tds/TDSSheet';
 
 function App() {
   return (
@@ -87,6 +88,7 @@ function App() {
               <Route path="reports" element={<Reports />} />
               <Route path="reports/gst" element={<GSTReports />} />
               <Route path="reports/expected-income" element={<ExpectedIncome />} />
+              <Route path="tds" element={<TDSSheet />} />
               <Route path="settings" element={<Settings />} />
             </Route>
           </Route>

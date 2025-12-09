@@ -69,6 +69,7 @@ class Invoice(BaseModel):
     tds_section = Column(String(10), nullable=True)
     tds_rate = Column(Numeric(5, 2), default=0, nullable=False)
     tds_amount = Column(Numeric(15, 2), default=0, nullable=False)
+    tds_challan_id = Column(Integer, ForeignKey("tds_challans.id"), nullable=True, index=True)
 
     # TCS (Tax Collected at Source)
     tcs_applicable = Column(Boolean, default=False, nullable=False)
@@ -110,6 +111,7 @@ class Invoice(BaseModel):
     items = relationship("InvoiceItem", back_populates="invoice", cascade="all, delete-orphan")
     payments = relationship("Payment", back_populates="invoice")
     attachments = relationship("InvoiceAttachment", back_populates="invoice", cascade="all, delete-orphan")
+    tds_challan = relationship("TDSChallan", foreign_keys=[tds_challan_id])
 
 
 class InvoiceItem(BaseModel):

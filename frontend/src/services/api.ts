@@ -22,6 +22,16 @@ import type {
   Item,
   ClientPO,
   BillingSchedule,
+  ProformaInvoice,
+  TDSChallan,
+  TDSChallanCreate,
+  TDSChallanUpdate,
+  TDSReturn,
+  TDSReturnUpdate,
+  TDSSheetData,
+  PendingTDSResponse,
+  TDSReturnExportResponse,
+  TDSType,
 } from '../types';
 
 const API_BASE_URL = '/api/v1';
@@ -536,4 +546,121 @@ export const clientPOApi = {
   // Create PI from schedule
   createPIFromSchedule: (poId: number, scheduleId: number, data?: { invoice_date?: string; due_date?: string; bank_account_id?: number; notes?: string }) =>
     api.post<ProformaInvoice>(`/client-pos/${poId}/schedules/${scheduleId}/create-pi`, data || {}),
+};
+
+// TDS API
+export const tdsApi = {
+  // TDS Sheet
+  getSheet: (params: { financial_year: string; tds_type: TDSType; branch_id?: number }) =>
+    api.get<TDSSheetData>('/tds/sheet', params as Record<string, unknown>),
+
+  // Pending TDS Transactions
+  getPending: (params: { financial_year: string; month: number; tds_type: TDSType; branch_id?: number }) =>
+    api.get<PendingTDSResponse>(`/tds/pending/${params.financial_year}/${params.month}`, {
+      tds_type: params.tds_type,
+      branch_id: params.branch_id,
+    }),
+
+  // Challans
+  createChallan: (data: TDSChallanCreate) => api.post<TDSChallan>('/tds/challan', data),
+  getChallan: (id: number) => api.get<TDSChallan>(`/tds/challan/${id}`),
+  updateChallan: (id: number, data: TDSChallanUpdate) => api.put<TDSChallan>(`/tds/challan/${id}`, data),
+  listChallans: (params: { financial_year: string; tds_type: TDSType; month?: number; branch_id?: number }) =>
+    api.get<TDSChallan[]>('/tds/challans', params as Record<string, unknown>),
+
+  uploadChallanFile: async (challanId: number, file: File) => {
+    const formData = new FormData();
+    formData.append('file', file);
+    const token = localStorage.getItem('access_token');
+    if (!token) {
+      throw new Error('Not authenticated. Please log in again.');
+    }
+    const response = await fetch(`/api/v1/tds/challan/${challanId}/upload`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+      },
+      body: formData,
+    });
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.detail || 'Failed to upload challan file');
+    }
+    return response.json();
+  },
+
+  downloadChallanFile: async (challanId: number, filename: string) => {
+    const token = localStorage.getItem('access_token');
+    if (!token) {
+      throw new Error('Not authenticated. Please log in again.');
+    }
+    const response = await fetch(`/api/v1/tds/challan/${challanId}/download`, {
+      headers: { 'Authorization': `Bearer ${token}` },
+    });
+    if (!response.ok) throw new Error('Failed to download file');
+    const blob = await response.blob();
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    window.URL.revokeObjectURL(url);
+  },
+
+  // Returns
+  getReturn: (params: { financial_year: string; quarter: number; tds_type: TDSType; branch_id?: number }) =>
+    api.get<TDSReturn>(`/tds/return/${params.financial_year}/${params.quarter}`, {
+      tds_type: params.tds_type,
+      branch_id: params.branch_id,
+    }),
+  updateReturn: (id: number, data: TDSReturnUpdate) => api.put<TDSReturn>(`/tds/return/${id}`, data),
+
+  uploadReturnFile: async (returnId: number, file: File) => {
+    const formData = new FormData();
+    formData.append('file', file);
+    const token = localStorage.getItem('access_token');
+    if (!token) {
+      throw new Error('Not authenticated. Please log in again.');
+    }
+    const response = await fetch(`/api/v1/tds/return/${returnId}/upload`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+      },
+      body: formData,
+    });
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.detail || 'Failed to upload return file');
+    }
+    return response.json();
+  },
+
+  downloadReturnFile: async (returnId: number, filename: string) => {
+    const token = localStorage.getItem('access_token');
+    if (!token) {
+      throw new Error('Not authenticated. Please log in again.');
+    }
+    const response = await fetch(`/api/v1/tds/return/${returnId}/download`, {
+      headers: { 'Authorization': `Bearer ${token}` },
+    });
+    if (!response.ok) throw new Error('Failed to download file');
+    const blob = await response.blob();
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    window.URL.revokeObjectURL(url);
+  },
+
+  exportReturn: (params: { financial_year: string; quarter: number; tds_type: TDSType; branch_id?: number }) =>
+    api.get<TDSReturnExportResponse>(`/tds/return/${params.financial_year}/${params.quarter}/export`, {
+      tds_type: params.tds_type,
+      branch_id: params.branch_id,
+    }),
 };

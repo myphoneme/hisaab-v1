@@ -20,6 +20,7 @@ from app.api.v1.endpoints import (
     items,
     client_pos,
     proforma_invoices,
+    tds,
 )
 
 api_router = APIRouter()
@@ -43,3 +44,4 @@ api_router.include_router(states.router, prefix="/states", tags=["States"])
 api_router.include_router(items.router, prefix="/items", tags=["Items"])
 api_router.include_router(client_pos.router, prefix="/client-pos", tags=["Client POs"])
 api_router.include_router(proforma_invoices.router, prefix="/proforma-invoices", tags=["Proforma Invoices"])
+api_router.include_router(tds.router, prefix="/tds", tags=["TDS"])

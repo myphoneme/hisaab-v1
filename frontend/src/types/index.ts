@@ -967,3 +967,180 @@ export interface CompanySettingsUpdate {
   default_tds_payable_account_id?: number;
   default_round_off_account_id?: number;
 }
+
+// TDS Types
+export type TDSType = 'PAYABLE' | 'RECEIVABLE';
+export type ReturnStatus = 'DRAFT' | 'FILED' | 'REVISED';
+
+export interface TDSChallanEntry extends BaseEntity {
+  challan_id: number;
+  invoice_id: number;
+  party_name: string;
+  party_pan: string | null;
+  invoice_number: string;
+  invoice_date: string;
+  base_amount: number;
+  tds_rate: number;
+  tds_section: string;
+  tds_amount: number;
+  penalty: number;
+  interest: number;
+}
+
+export interface TDSChallan extends BaseEntity {
+  challan_number: string;
+  bsr_code: string;
+  financial_year: string;
+  month: number;
+  quarter: number;
+  tds_type: TDSType;
+  tds_amount: number;
+  penalty: number;
+  interest: number;
+  total_amount: number;
+  payment_date: string;
+  transaction_id: string | null;
+  branch_id: number | null;
+  challan_file_path: string | null;
+  challan_filename: string | null;
+  notes: string | null;
+  entries?: TDSChallanEntry[];
+}
+
+export interface TDSChallanEntryCreate {
+  invoice_id: number;
+  party_name: string;
+  party_pan?: string;
+  invoice_number: string;
+  invoice_date: string;
+  base_amount: number;
+  tds_rate: number;
+  tds_section: string;
+  tds_amount: number;
+  penalty?: number;
+  interest?: number;
+}
+
+export interface TDSChallanCreate {
+  challan_number: string;
+  bsr_code: string;
+  financial_year: string;
+  month: number;
+  quarter: number;
+  tds_type: TDSType;
+  payment_date: string;
+  transaction_id?: string;
+  branch_id?: number;
+  penalty?: number;
+  interest?: number;
+  notes?: string;
+  entries: TDSChallanEntryCreate[];
+}
+
+export interface TDSChallanUpdate {
+  challan_number?: string;
+  bsr_code?: string;
+  payment_date?: string;
+  transaction_id?: string;
+  penalty?: number;
+  interest?: number;
+  notes?: string;
+}
+
+export interface TDSReturn extends BaseEntity {
+  financial_year: string;
+  quarter: number;
+  tds_type: TDSType;
+  branch_id: number | null;
+  return_file_path: string | null;
+  return_filename: string | null;
+  status: ReturnStatus;
+  filed_date: string | null;
+  acknowledgment_number: string | null;
+}
+
+export interface TDSReturnUpdate {
+  status?: ReturnStatus;
+  filed_date?: string;
+  acknowledgment_number?: string;
+}
+
+export interface PendingTDSTransaction {
+  invoice_id: number;
+  invoice_number: string;
+  invoice_date: string;
+  party_name: string;
+  party_pan: string | null;
+  base_amount: number;
+  tds_rate: number;
+  tds_section: string;
+  tds_amount: number;
+}
+
+export interface MonthData {
+  tds_payable: number;
+  tds_paid: number;
+  penalty: number;
+  interest: number;
+  challan_count: number;
+  has_challan_files: boolean;
+  tds_deducted: number;
+  has_pending: boolean;
+}
+
+export interface QuarterData {
+  quarter: number;
+  return_status: ReturnStatus | null;
+  has_return_file: boolean;
+  return_id: number | null;
+}
+
+export interface TDSSheetData {
+  financial_year: string;
+  tds_type: TDSType;
+  branch_id: number | null;
+  month_data: Record<number, MonthData>;
+  quarter_data: Record<number, QuarterData>;
+  totals: {
+    tds_payable: number;
+    tds_paid: number;
+    penalty: number;
+    interest: number;
+    tds_deducted: number;
+  };
+}
+
+export interface PendingTDSResponse {
+  transactions: PendingTDSTransaction[];
+  total_tds: number;
+  count: number;
+}
+
+export interface TDSReturnExportEntry {
+  vendor_name: string;
+  pan: string | null;
+  base_amount: number;
+  tds: number;
+  penalty: number;
+  interest: number;
+  tds_payable: number;
+  payment_date: string | null;
+  challan_no: string | null;
+  bsr_code: string | null;
+  payment: number | null;
+  invoice_date: string;
+  invoice_number: string;
+  section_name: string;
+  tds_percent: number;
+}
+
+export interface TDSReturnExportResponse {
+  financial_year: string;
+  quarter: number;
+  tds_type: TDSType;
+  entries: TDSReturnExportEntry[];
+  total_tds: number;
+  total_penalty: number;
+  total_interest: number;
+  total_payable: number;
+}

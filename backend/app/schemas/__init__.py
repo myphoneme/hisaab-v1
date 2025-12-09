@@ -31,6 +31,21 @@ from app.schemas.billing_schedule import (
     GenerateSchedulesRequest,
 )
 from app.schemas.common import PaginatedResponse, Message
+from app.schemas.tds import (
+    TDSChallanCreate,
+    TDSChallanUpdate,
+    TDSChallanResponse,
+    TDSChallanListResponse,
+    TDSChallanEntryCreate,
+    TDSChallanEntryResponse,
+    TDSReturnCreate,
+    TDSReturnUpdate,
+    TDSReturnResponse,
+    TDSSheetResponse,
+    PendingTDSTransaction,
+    PendingTDSResponse,
+    TDSReturnExportResponse,
+)
 
 __all__ = [
     "UserCreate",
@@ -82,4 +97,17 @@ __all__ = [
     "GenerateSchedulesRequest",
     "PaginatedResponse",
     "Message",
+    "TDSChallanCreate",
+    "TDSChallanUpdate",
+    "TDSChallanResponse",
+    "TDSChallanListResponse",
+    "TDSChallanEntryCreate",
+    "TDSChallanEntryResponse",
+    "TDSReturnCreate",
+    "TDSReturnUpdate",
+    "TDSReturnResponse",
+    "TDSSheetResponse",
+    "PendingTDSTransaction",
+    "PendingTDSResponse",
+    "TDSReturnExportResponse",
 ]
