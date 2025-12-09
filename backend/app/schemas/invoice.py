@@ -12,6 +12,8 @@ from app.schemas.bank_account import BankAccountResponse
 
 class InvoiceItemBase(BaseModel):
     serial_no: int
+    item_id: Optional[int] = None
+    item_name: Optional[str] = None
     description: str
     hsn_sac: Optional[str] = None
     quantity: Decimal

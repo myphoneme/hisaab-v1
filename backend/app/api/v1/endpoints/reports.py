@@ -1458,6 +1458,139 @@ async def get_party_ledger_pdf(
     )
 
 
+@router.get("/invoices/monthly-summary")
+async def get_invoices_monthly_summary(
+    financial_year: str = Query(..., description="Financial year in format YYYY-YYYY (e.g., 2025-2026)"),
+    branch_id: Optional[int] = None,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """
+    Get month-wise invoice summary for a financial year.
+    Shows transactions count, invoice value, CGST, SGST, IGST, paid, and due amounts.
+    Financial year runs from April to March.
+    """
+    # Parse financial year
+    try:
+        parts = financial_year.split('-')
+        if len(parts) != 2:
+            raise ValueError("Invalid format")
+        start_year = int(parts[0])
+        end_year = int(parts[1])
+        if end_year != start_year + 1:
+            raise ValueError("Invalid year range")
+    except (ValueError, IndexError):
+        raise HTTPException(
+            status_code=400,
+            detail="Invalid financial_year format. Use YYYY-YYYY (e.g., 2025-2026)"
+        )
+
+    # FY date range: April 1 of start_year to March 31 of end_year
+    fy_start = date(start_year, 4, 1)
+    fy_end = date(end_year, 3, 31)
+
+    # Build base query for SALES invoices (excluding cancelled)
+    base_where = [
+        Invoice.invoice_type == InvoiceType.SALES,
+        Invoice.status != InvoiceStatus.CANCELLED,
+        Invoice.invoice_date >= fy_start,
+        Invoice.invoice_date <= fy_end,
+    ]
+    if branch_id:
+        base_where.append(Invoice.branch_id == branch_id)
+
+    # Get all invoices for the FY
+    result = await db.execute(
+        select(Invoice).where(*base_where)
+    )
+    invoices = result.scalars().all()
+
+    # Initialize month data structure (April=4 to March=3)
+    months_order = [4, 5, 6, 7, 8, 9, 10, 11, 12, 1, 2, 3]
+    month_names = {
+        1: "January", 2: "February", 3: "March", 4: "April",
+        5: "May", 6: "June", 7: "July", 8: "August",
+        9: "September", 10: "October", 11: "November", 12: "December"
+    }
+
+    months_data = {}
+    for month in months_order:
+        year = start_year if month >= 4 else end_year
+        months_data[month] = {
+            "month": month,
+            "year": year,
+            "month_name": month_names[month],
+            "transactions": 0,
+            "invoice_value": Decimal('0'),
+            "cgst": Decimal('0'),
+            "sgst": Decimal('0'),
+            "igst": Decimal('0'),
+            "paid": Decimal('0'),
+            "due": Decimal('0'),
+        }
+
+    # Aggregate invoice data by month
+    total_summary = {
+        "total_transactions": 0,
+        "total_invoice_value": Decimal('0'),
+        "total_cgst": Decimal('0'),
+        "total_sgst": Decimal('0'),
+        "total_igst": Decimal('0'),
+        "total_paid": Decimal('0'),
+        "total_due": Decimal('0'),
+    }
+
+    for inv in invoices:
+        month = inv.invoice_date.month
+        if month in months_data:
+            months_data[month]["transactions"] += 1
+            months_data[month]["invoice_value"] += inv.total_amount
+            months_data[month]["cgst"] += inv.cgst_amount
+            months_data[month]["sgst"] += inv.sgst_amount
+            months_data[month]["igst"] += inv.igst_amount
+            months_data[month]["paid"] += inv.amount_paid
+            months_data[month]["due"] += inv.amount_due
+
+            total_summary["total_transactions"] += 1
+            total_summary["total_invoice_value"] += inv.total_amount
+            total_summary["total_cgst"] += inv.cgst_amount
+            total_summary["total_sgst"] += inv.sgst_amount
+            total_summary["total_igst"] += inv.igst_amount
+            total_summary["total_paid"] += inv.amount_paid
+            total_summary["total_due"] += inv.amount_due
+
+    # Convert to list in FY order (April to March)
+    months_list = []
+    for month in months_order:
+        data = months_data[month]
+        months_list.append({
+            "month": data["month"],
+            "year": data["year"],
+            "month_name": data["month_name"],
+            "transactions": data["transactions"],
+            "invoice_value": float(data["invoice_value"]),
+            "cgst": float(data["cgst"]),
+            "sgst": float(data["sgst"]),
+            "igst": float(data["igst"]),
+            "paid": float(data["paid"]),
+            "due": float(data["due"]),
+        })
+
+    return {
+        "financial_year": financial_year,
+        "summary": {
+            "total_transactions": total_summary["total_transactions"],
+            "total_invoice_value": float(total_summary["total_invoice_value"]),
+            "total_cgst": float(total_summary["total_cgst"]),
+            "total_sgst": float(total_summary["total_sgst"]),
+            "total_igst": float(total_summary["total_igst"]),
+            "total_paid": float(total_summary["total_paid"]),
+            "total_due": float(total_summary["total_due"]),
+        },
+        "months": months_list,
+    }
+
+
 @router.get("/expected-income")
 async def get_expected_income(
     from_month: Optional[str] = Query(None, description="Start month in YYYY-MM format"),

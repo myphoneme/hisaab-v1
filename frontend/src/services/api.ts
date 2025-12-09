@@ -228,6 +228,51 @@ export interface PartyLedgerResponse {
   closing_balance: number;
 }
 
+// Invoice Monthly Summary Response type
+export interface MonthSummary {
+  month: number;
+  year: number;
+  month_name: string;
+  transactions: number;
+  invoice_value: number;
+  cgst: number;
+  sgst: number;
+  igst: number;
+  paid: number;
+  due: number;
+}
+
+export interface InvoiceMonthlySummaryResponse {
+  financial_year: string;
+  summary: {
+    total_transactions: number;
+    total_invoice_value: number;
+    total_cgst: number;
+    total_sgst: number;
+    total_igst: number;
+    total_paid: number;
+    total_due: number;
+  };
+  months: MonthSummary[];
+}
+
+// Invoice By Month Response type
+export interface InvoiceByMonth {
+  id: number;
+  invoice_number: string;
+  invoice_date: string;
+  client_name: string;
+  taxable_amount: number;
+  cgst_amount: number;
+  sgst_amount: number;
+  igst_amount: number;
+  total_amount: number;
+  amount_paid: number;
+  amount_due: number;
+  status: string;
+  branch_name: string | null;
+}
+
 // Reports API
 export const reportsApi = {
   getDashboard: (params?: Record<string, unknown>) => api.get<DashboardStats>('/reports/dashboard', params),
@@ -254,6 +299,17 @@ export const reportsApi = {
     return response.blob();
   },
   getExpectedIncome: (params?: Record<string, unknown>) => api.get<ExpectedIncomeResponse>('/reports/expected-income', params),
+  getInvoiceMonthlySummary: (financialYear: string, branchId?: number) =>
+    api.get<InvoiceMonthlySummaryResponse>('/reports/invoices/monthly-summary', {
+      financial_year: financialYear,
+      ...(branchId && { branch_id: branchId }),
+    }),
+};
+
+// Invoice By Month API
+export const invoiceByMonthApi = {
+  getByMonth: (year: number, month: number, branchId?: number) =>
+    api.get<InvoiceByMonth[]>(`/invoices/by-month/${year}/${month}`, branchId ? { branch_id: branchId } : undefined),
 };
 
 // Expected Income Response type
@@ -348,6 +404,9 @@ export const invoiceAttachmentApi = {
     if (description) formData.append('description', description);
 
     const token = localStorage.getItem('access_token');
+    if (!token) {
+      throw new Error('Not authenticated. Please log in again.');
+    }
     const response = await fetch(`/api/v1/invoices/${invoiceId}/attachments`, {
       method: 'POST',
       headers: {
@@ -370,6 +429,9 @@ export const invoiceAttachmentApi = {
 
   download: async (invoiceId: number, attachmentId: number, filename: string) => {
     const token = localStorage.getItem('access_token');
+    if (!token) {
+      throw new Error('Not authenticated. Please log in again.');
+    }
     const response = await fetch(
       `/api/v1/invoices/${invoiceId}/attachments/${attachmentId}/download`,
       {

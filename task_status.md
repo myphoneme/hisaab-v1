@@ -129,6 +129,46 @@ Files cleaned:
 
 ---
 
+## Bug Fixes (Session 4 - December 9, 2025)
+
+| # | Bug | Root Cause | Fix Applied |
+|---|-----|------------|-------------|
+| 1 | Invoice Due Amount ₹0 | `amount_after_tds` not set when creating PI from billing schedule | Added `amount_after_tds=schedule.total_amount` in `fulfillment.py` |
+| 2 | PI Edit - Item not selected | Item ID/Name missing from item mapping in form | Added `item_id` and `item_name` to item mapping |
+| 3 | Terms & Conditions not auto-populating | Settings fields missing, forms not fetching settings | Added `pi_terms`, `purchase_order_terms` to Settings; Updated forms |
+
+## Invoice Dashboard Module (Session 4 - December 9, 2025)
+
+### Completed
+| # | Task | Status | Files Modified |
+|---|------|--------|----------------|
+| 1 | Monthly Invoice Summary API | ✅ Completed | `backend/app/api/v1/endpoints/reports.py` |
+| 2 | Invoices By Month API | ✅ Completed | `backend/app/api/v1/endpoints/invoices.py` |
+| 3 | Invoice Dashboard Page | ✅ Completed | `frontend/src/pages/invoices/InvoiceDashboard.tsx` |
+| 4 | Collapsible Month Table | ✅ Completed | Built into `InvoiceDashboard.tsx` |
+| 5 | Summary Widgets with Icons | ✅ Completed | Transactions, Invoice Value, GST, Paid, Due |
+| 6 | Datatable Toggle View | ✅ Completed | Switch between month view and full datatable |
+| 7 | Independent Module Navigation | ✅ Completed | All routes use `/invoices-dashboard/*` |
+| 8 | Sidebar Menu Item | ✅ Completed | Added "Invoice Dashboard" link |
+
+### Bug Fixes (December 9, 2025 - Part 2)
+| # | Bug | Root Cause | Fix Applied |
+|---|-----|------------|-------------|
+| 1 | Datatable 422 Error | Backend `page_size` limit was 100, frontend requesting 1000 | Increased limit to 1000 in `invoices.py` |
+| 2 | Cancel button leading to old module | Hardcoded `/invoices` path in cancel buttons | Changed to `navigate(returnPath)` |
+| 3 | View/Edit buttons leading to old module | Navigate using fixed path | Updated to use `MODULE_BASE_PATH` |
+| 4 | Item Name not selected in edit | `item_id` and `item_name` not in model/schema | Added to Invoice model, schema, and frontend types |
+| 5 | Expanded rows hard to distinguish | Same background as parent rows | Added amber background (`bg-amber-50`) with left border |
+| 6 | File Upload 401 Unauthorized | `invoice_attachments.py` imported `get_current_user` from wrong path | Changed import from `app.api.v1.endpoints.auth` to `app.core.security` |
+| 7 | Invoice Print - Logo too large | Logo using `h-20` (80px) | Reduced to `h-16` with print-specific `h-10` (40px) |
+| 8 | Invoice Print - Content cut off at bottom | Missing page settings and overflow handling | Added `@page` rules with margins and proper overflow handling |
+| 9 | Invoice Print - TanStack icon showing | React Query Devtools visible in print | Added CSS selectors to hide devtools in print mode |
+
+### Database Migration
+- `a6cac5aca80d_add_item_id_item_name_to_invoice_items.py` - Added `item_id` and `item_name` columns to `invoice_items` table
+
+---
+
 ## Current Sprint (December 8, 2025) - In Progress
 
 ### Topic 1: Client PO Module Improvements
@@ -142,27 +182,27 @@ Files cleaned:
 | 1.6 | Invoice Print - Scrollbar | Pending | Hide in print |
 | 1.7 | Invoice Print - Stamp | Pending | Add "For [Company]" + "Director" stamp |
 
-### Topic 2: Revenue Report Module (New)
+### Topic 2: Revenue Report Module (New) - COMPLETED
 | # | Task | Status | Details |
 |---|------|--------|---------|
-| 2.1 | New Module | Pending | Separate "Revenue Report" page |
-| 2.2 | Breadcrumb | Pending | Navigation trail |
-| 2.3 | Filters | Pending | Financial Year + Branch |
-| 2.4 | Widgets | Pending | Transactions, Dues, Payment, Net summary |
-| 2.5 | Collapsible Table | Pending | Month-wise grouping |
-| 2.6 | Expandable Rows | Pending | Show invoices within each month |
+| 2.1 | New Module | ✅ Completed | Invoice Dashboard at `/invoices-dashboard` |
+| 2.2 | Breadcrumb | ✅ Completed | Dashboard > Sales Invoices |
+| 2.3 | Filters | ✅ Completed | Financial Year + Branch + Datatable toggle |
+| 2.4 | Widgets | ✅ Completed | Transactions, Invoice Value, GST, Paid, Due with icons |
+| 2.5 | Collapsible Table | ✅ Completed | Month-wise grouping (April to March) |
+| 2.6 | Expandable Rows | ✅ Completed | Click month to see invoices, amber background |
 
-### Topic 3: PI (Proforma Invoice) Module (New)
+### Topic 3: PI (Proforma Invoice) Module - COMPLETED (Previous Session)
 | # | Task | Status | Details |
 |---|------|--------|---------|
-| 3.1 | PI Database Model | Pending | New proforma_invoices table |
-| 3.2 | PI Number Pattern | Pending | `PI/2025-26/12/0001` |
-| 3.3 | PI Backend API | Pending | CRUD + Generate Invoice endpoint |
-| 3.4 | PI Frontend - List | Pending | List with filters |
-| 3.5 | PI Frontend - Form | Pending | Create/Edit PI |
-| 3.6 | PI Frontend - View | Pending | View/Print PI |
-| 3.7 | Update Client PO | Pending | Create PI instead of Invoice |
-| 3.8 | PI Status Management | Pending | DRAFT → SENT → GENERATED | 
+| 3.1 | PI Database Model | ✅ Completed | `proforma_invoices` table |
+| 3.2 | PI Number Pattern | ✅ Completed | `PI/2025-26/12/0001` |
+| 3.3 | PI Backend API | ✅ Completed | CRUD + Generate Invoice endpoint |
+| 3.4 | PI Frontend - List | ✅ Completed | List with filters |
+| 3.5 | PI Frontend - Form | ✅ Completed | Create/Edit PI |
+| 3.6 | PI Frontend - View | ✅ Completed | View/Print PI |
+| 3.7 | Update Client PO | ✅ Completed | Create PI from billing schedule |
+| 3.8 | PI Status Management | ✅ Completed | DRAFT → SENT → CONVERTED | 
 
 ---
 
@@ -191,4 +231,4 @@ Files cleaned:
 
 ---
 
-*Last Updated: December 8, 2025*
+*Last Updated: December 9, 2025*

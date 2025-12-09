@@ -19,6 +19,7 @@ import {
   ClipboardList,
   TrendingUp,
   FileCheck,
+  CalendarDays,
 } from 'lucide-react';
 import { cn } from '../../lib/utils';
 
@@ -33,6 +34,7 @@ const navigation = [
   { name: 'Proforma Invoices', href: '/proforma-invoices', icon: FileCheck },
   { name: 'Purchase Orders', href: '/purchase-orders', icon: ShoppingCart },
   { name: 'Invoices', href: '/invoices', icon: FileText },
+  { name: 'Invoice Dashboard', href: '/invoices-dashboard', icon: CalendarDays },
   { name: 'Payments', href: '/payments', icon: CreditCard },
   { name: 'Cash Expenses', href: '/cash-expenses', icon: Wallet },
   { name: 'Expense Categories', href: '/expense-categories', icon: Tag },

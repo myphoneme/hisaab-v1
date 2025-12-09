@@ -118,6 +118,10 @@ class InvoiceItem(BaseModel):
     # Parent
     invoice_id = Column(Integer, ForeignKey("invoices.id"), nullable=False)
 
+    # Item Master Reference (optional)
+    item_id = Column(Integer, ForeignKey("items.id"), nullable=True)
+    item_name = Column(String(200), nullable=True)
+
     # Item Details
     serial_no = Column(Integer, nullable=False)
     description = Column(String(500), nullable=False)

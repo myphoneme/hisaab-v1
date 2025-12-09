@@ -9,7 +9,7 @@ from app.db.session import get_db
 from app.models.user import User
 from app.models.invoice import Invoice
 from app.models.invoice_attachment import InvoiceAttachment
-from app.api.v1.endpoints.auth import get_current_user
+from app.core.security import get_current_user
 from app.services.file_storage import FileStorageService
 from app.core.config import settings
 

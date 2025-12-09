@@ -341,47 +341,41 @@ export function ProformaInvoiceView() {
           {/* Line Items Table */}
           <div className="mb-6">
             <h3 className="text-lg font-semibold mb-3">Items</h3>
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead className="bg-gray-50">
-                  <tr>
-                    <th className="px-3 py-2 text-left">S.No</th>
-                    <th className="px-3 py-2 text-left">Description</th>
-                    <th className="px-3 py-2 text-left">HSN/SAC</th>
-                    <th className="px-3 py-2 text-right">Qty</th>
-                    <th className="px-3 py-2 text-right">Rate</th>
-                    <th className="px-3 py-2 text-right">Amount</th>
-                    <th className="px-3 py-2 text-right">GST %</th>
-                    <th className="px-3 py-2 text-right">GST Amt</th>
-                    <th className="px-3 py-2 text-right">Total</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {pi.items?.map((item, index) => {
-                    const itemAmount = Number(item.quantity) * Number(item.rate);
-                    const gstAmount = Number(item.cgst_amount || 0) + Number(item.sgst_amount || 0) + Number(item.igst_amount || 0);
+            <table className="w-full text-sm border-collapse">
+              <thead className="bg-gray-50">
+                <tr>
+                  <th className="border px-2 py-2 text-left">S.No</th>
+                  <th className="border px-2 py-2 text-left">Description</th>
+                  <th className="border px-2 py-2 text-left">HSN/SAC</th>
+                  <th className="border px-2 py-2 text-right">Qty</th>
+                  <th className="border px-2 py-2 text-right">Rate</th>
+                  <th className="border px-2 py-2 text-right">Amount</th>
+                  <th className="border px-2 py-2 text-right">GST%</th>
+                  <th className="border px-2 py-2 text-right">GST Amt</th>
+                  <th className="border px-2 py-2 text-right">Total</th>
+                </tr>
+              </thead>
+              <tbody>
+                {pi.items?.map((item, index) => {
+                  const itemAmount = Number(item.quantity) * Number(item.rate);
+                  const gstAmount = Number(item.cgst_amount || 0) + Number(item.sgst_amount || 0) + Number(item.igst_amount || 0);
 
-                    return (
-                      <tr key={item.id || index} className="border-b">
-                        <td className="px-3 py-2">{item.serial_no || index + 1}</td>
-                        <td className="px-3 py-2">
-                          <p className="font-medium">{item.description}</p>
-                        </td>
-                        <td className="px-3 py-2">{item.hsn_sac}</td>
-                        <td className="px-3 py-2 text-right">
-                          {item.quantity} {item.unit}
-                        </td>
-                        <td className="px-3 py-2 text-right">{formatCurrency(item.rate)}</td>
-                        <td className="px-3 py-2 text-right">{formatCurrency(itemAmount)}</td>
-                        <td className="px-3 py-2 text-right">{Number(item.gst_rate)}%</td>
-                        <td className="px-3 py-2 text-right">{formatCurrency(gstAmount)}</td>
-                        <td className="px-3 py-2 text-right font-medium">{formatCurrency(item.total_amount)}</td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
+                  return (
+                    <tr key={item.id || index}>
+                      <td className="border px-2 py-2">{item.serial_no || index + 1}</td>
+                      <td className="border px-2 py-2">{item.description}</td>
+                      <td className="border px-2 py-2">{item.hsn_sac}</td>
+                      <td className="border px-2 py-2 text-right">{item.quantity} {item.unit}</td>
+                      <td className="border px-2 py-2 text-right">{formatCurrency(item.rate)}</td>
+                      <td className="border px-2 py-2 text-right">{formatCurrency(itemAmount)}</td>
+                      <td className="border px-2 py-2 text-right">{Number(item.gst_rate)}%</td>
+                      <td className="border px-2 py-2 text-right">{formatCurrency(gstAmount)}</td>
+                      <td className="border px-2 py-2 text-right font-medium">{formatCurrency(item.total_amount)}</td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
           </div>
 
           {/* Tax Summary */}
@@ -524,41 +518,88 @@ export function ProformaInvoiceView() {
       {/* Print Styles */}
       <style>{`
         @media print {
-          .no-print {
+          /* Page settings */
+          @page {
+            margin: 10mm;
+            size: A4 portrait;
+          }
+
+          /* Hide non-print elements */
+          .no-print,
+          .tsqd-open-btn-container,
+          .tsqd-main-panel,
+          .tsqd-parent-container,
+          [class*="ReactQueryDevtools"],
+          [data-reactquerydevtools],
+          button[aria-label="Open React Query Devtools"],
+          aside, nav, header {
             display: none !important;
           }
+
+          /* Reset layout constraints for multi-page print */
+          html, body, #root, #root > div,
+          .h-screen, .flex-1, main {
+            height: auto !important;
+            overflow: visible !important;
+          }
+
+          .overflow-hidden, .overflow-y-auto, .overflow-x-auto {
+            overflow: visible !important;
+          }
+
+          body, main {
+            padding: 0 !important;
+            margin: 0 !important;
+          }
+
+          /* Hide scrollbars */
           body {
-            margin: 0;
-            padding: 0;
             -ms-overflow-style: none;
             scrollbar-width: none;
           }
-          body::-webkit-scrollbar {
-            display: none;
-          }
-          ::-webkit-scrollbar {
-            display: none;
-          }
+
+          /* Invoice container */
           .invoice-container {
             box-shadow: none !important;
-            max-width: none !important;
+            border: none !important;
+            margin: 0 !important;
+            padding: 5mm !important;
           }
+
+          /* Table styles */
           table {
-            page-break-inside: avoid;
+            width: 100% !important;
+            font-size: 10pt !important;
+            border-collapse: collapse !important;
           }
-          tr {
-            page-break-inside: avoid;
+
+          th, td {
+            padding: 6px 8px !important;
+            border: 1px solid #ccc !important;
           }
-          .bg-gray-50 {
-            background-color: #f9fafb !important;
+
+          th {
+            background-color: #f0f0f0 !important;
+            font-weight: bold !important;
             -webkit-print-color-adjust: exact;
             print-color-adjust: exact;
           }
-          /* Hide React Query Devtools */
-          .tsqd-parent-container,
-          [class*="ReactQueryDevtools"],
-          [data-reactquerydevtools] {
-            display: none !important;
+
+          /* Keep rows together */
+          tr {
+            page-break-inside: avoid;
+          }
+
+          /* Repeat table header on each page */
+          thead {
+            display: table-header-group;
+          }
+
+          /* Background colors */
+          .bg-gray-50 {
+            background-color: #f0f0f0 !important;
+            -webkit-print-color-adjust: exact;
+            print-color-adjust: exact;
           }
         }
       `}</style>

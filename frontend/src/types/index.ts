@@ -228,6 +228,8 @@ export interface InvoiceItem {
   id: number;
   invoice_id: number;
   serial_no: number;
+  item_id?: number;
+  item_name?: string;
   description: string;
   hsn_sac: string;
   quantity: number;

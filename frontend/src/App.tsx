@@ -23,6 +23,7 @@ import { Vendors } from './pages/vendors/Vendors';
 import { Branches } from './pages/branches/Branches';
 import { BankAccounts } from './pages/bank-accounts/BankAccounts';
 import { Invoices } from './pages/invoices/Invoices';
+import { InvoiceDashboard } from './pages/invoices/InvoiceDashboard';
 import { InvoiceForm } from './pages/invoices/InvoiceForm';
 import { InvoiceView } from './pages/invoices/InvoiceView';
 import { Payments } from './pages/payments/Payments';
@@ -71,6 +72,10 @@ function App() {
               <Route path="proforma-invoices/:id/edit" element={<ProformaInvoiceForm />} />
               <Route path="purchase-orders" element={<PurchaseOrders />} />
               <Route path="invoices" element={<Invoices />} />
+              <Route path="invoices-dashboard" element={<InvoiceDashboard />} />
+              <Route path="invoices-dashboard/new" element={<InvoiceForm returnPath="/invoices-dashboard" />} />
+              <Route path="invoices-dashboard/:id/edit" element={<InvoiceForm returnPath="/invoices-dashboard" />} />
+              <Route path="invoices-dashboard/:id" element={<InvoiceView returnPath="/invoices-dashboard" />} />
               <Route path="invoices/new" element={<InvoiceForm />} />
               <Route path="invoices/:id/edit" element={<InvoiceForm />} />
               <Route path="invoices/:id" element={<InvoiceView />} />

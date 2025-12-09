@@ -49,7 +49,11 @@ interface InvoiceFormData {
   items: InvoiceItem[];
 }
 
-export function InvoiceForm() {
+interface InvoiceFormProps {
+  returnPath?: string;
+}
+
+export function InvoiceForm({ returnPath = '/invoices' }: InvoiceFormProps) {
   const { id } = useParams();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
@@ -172,6 +176,8 @@ export function InvoiceForm() {
     if (existingInvoice) {
       const mappedItems = existingInvoice.items.map((item, index) => ({
         serial_no: item.serial_no || index + 1,
+        item_id: item.item_id,
+        item_name: item.item_name,
         description: item.description,
         hsn_sac: item.hsn_sac || '',
         quantity: Number(item.quantity),
@@ -254,7 +260,7 @@ export function InvoiceForm() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['invoices'] });
       alert('Invoice created successfully!');
-      navigate('/invoices');
+      navigate(returnPath);
     },
     onError: (error: any) => {
       alert(`Failed to create invoice: ${error.response?.data?.detail || error.message}`);
@@ -266,7 +272,7 @@ export function InvoiceForm() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['invoices'] });
       alert('Invoice updated successfully!');
-      navigate('/invoices');
+      navigate(returnPath);
     },
     onError: (error: any) => {
       alert(`Failed to update invoice: ${error.response?.data?.detail || error.message}`);
@@ -408,7 +414,7 @@ export function InvoiceForm() {
             {isEdit ? 'Update invoice details' : 'Create a new sales or purchase invoice'}
           </p>
         </div>
-        <Button variant="outline" onClick={() => navigate('/invoices')}>
+        <Button variant="outline" onClick={() => navigate(returnPath)}>
           <X className="h-4 w-4 mr-2" />
           Cancel
         </Button>
@@ -1003,7 +1009,7 @@ export function InvoiceForm() {
           <Button
             type="button"
             variant="outline"
-            onClick={() => navigate('/invoices')}
+            onClick={() => navigate(returnPath)}
           >
             Cancel
           </Button>

@@ -77,7 +77,7 @@ def calculate_invoice_item_amounts(item_data: dict, is_igst: bool) -> dict:
 @router.get("", response_model=PaginatedResponse[InvoiceResponse])
 async def get_invoices(
     page: int = Query(1, ge=1),
-    page_size: int = Query(10, ge=1, le=100),
+    page_size: int = Query(10, ge=1, le=1000),
     branch_id: Optional[int] = None,
     invoice_type: Optional[InvoiceType] = None,
     client_id: Optional[int] = None,
@@ -476,3 +476,65 @@ async def delete_invoice(
     await db.delete(invoice)
     await db.commit()
     return Message(message="Invoice deleted successfully")
+
+
+@router.get("/by-month/{year}/{month}")
+async def get_invoices_by_month(
+    year: int,
+    month: int,
+    branch_id: Optional[int] = None,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """
+    Get all SALES invoices for a specific month.
+    Used for expanding collapsible month rows in the dashboard.
+    """
+    if month < 1 or month > 12:
+        raise HTTPException(status_code=400, detail="Month must be between 1 and 12")
+
+    # Calculate month date range
+    from calendar import monthrange
+    first_day = date(year, month, 1)
+    last_day = date(year, month, monthrange(year, month)[1])
+
+    # Build query for SALES invoices
+    query = (
+        select(Invoice)
+        .options(
+            selectinload(Invoice.client),
+            selectinload(Invoice.branch),
+        )
+        .where(Invoice.invoice_type == InvoiceType.SALES)
+        .where(Invoice.status != InvoiceStatus.CANCELLED)
+        .where(Invoice.invoice_date >= first_day)
+        .where(Invoice.invoice_date <= last_day)
+    )
+
+    if branch_id:
+        query = query.where(Invoice.branch_id == branch_id)
+
+    query = query.order_by(Invoice.invoice_date.desc())
+
+    result = await db.execute(query)
+    invoices = result.scalars().all()
+
+    # Return simplified invoice data for the table
+    return [
+        {
+            "id": inv.id,
+            "invoice_number": inv.invoice_number,
+            "invoice_date": str(inv.invoice_date),
+            "client_name": inv.client.name if inv.client else "N/A",
+            "taxable_amount": float(inv.taxable_amount),
+            "cgst_amount": float(inv.cgst_amount),
+            "sgst_amount": float(inv.sgst_amount),
+            "igst_amount": float(inv.igst_amount),
+            "total_amount": float(inv.total_amount),
+            "amount_paid": float(inv.amount_paid),
+            "amount_due": float(inv.amount_due),
+            "status": inv.status.value,
+            "branch_name": inv.branch.branch_name if inv.branch else None,
+        }
+        for inv in invoices
+    ]
